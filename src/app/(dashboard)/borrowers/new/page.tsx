@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser, hasRole } from "@/lib/auth";
 import { SubmitButton } from "@/components/submit-button";
-import { createBorrowerAction } from "@/lib/actions/borrowers";
+import { BorrowerCreateForm } from "@/components/borrower-create-form";
 
 import { WeekdayPicker } from "@/components/weekday-picker";
 import { CompanyLookup } from "@/components/company-lookup";
@@ -93,7 +93,7 @@ export default async function NewBorrowerPage() {
         </p>
       </div>
 
-      <form action={createBorrowerAction} className="space-y-5">
+      <BorrowerCreateForm className="space-y-5">
         <Section title="Business">
           {companiesHouseReady && <CompanyLookup />}
           <Field label="Legal name" name="legalName" required placeholder="Acme Trading Ltd" />
@@ -189,7 +189,7 @@ export default async function NewBorrowerPage() {
             Create borrower
           </SubmitButton>
         </div>
-      </form>
+      </BorrowerCreateForm>
     </div>
   );
 }

@@ -289,3 +289,50 @@ export async function setBorrowerStatusAction(fd: FormData): Promise<void> {
   revalidatePath(`/borrowers/${borrowerId}`);
   revalidatePath("/borrowers");
 }
+
+/**
+ * createBorrowerAction, but reporting its refusals to the operator.
+ *
+ * Every validation failure in createBorrowerAction is a thrown Error, and a
+ * plain `<form action={...}>` has nowhere to put one: Next turns it into an
+ * unhandled server exception, so the operator got a blank "This page couldn't
+ * load. A server error occurred." page. The messages were already written for a
+ * human ("CAMBRIDGE PROPERTIES LTD is already onboarded under company number
+ * 16703081") and none of them ever reached one, so a duplicate company, a bad
+ * sort code and a genuine outage were indistinguishable.
+ *
+ * Success still redirects, and Next signals a redirect by throwing, so that one
+ * has to be re-thrown rather than reported as a failure.
+ */
+export type CreateBorrowerState = { message: string } | null;
+
+function isRedirect(error: unknown): boolean {
+  const digest = (error as { digest?: unknown } | null)?.digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
+}
+
+export async function createBorrowerFormAction(
+  _prev: CreateBorrowerState,
+  fd: FormData,
+): Promise<CreateBorrowerState> {
+  // Guarded here as well as inside createBorrowerAction. The delegation is easy
+  // to miss when reading this function alone, and an authorisation check that is
+  // only reachable through another function is the kind that quietly disappears.
+  // It also runs OUTSIDE the try, so a viewer is refused outright rather than
+  // being handed "not authorised" as if it were a validation message.
+  await requireRole("operator");
+
+  try {
+    await createBorrowerAction(fd);
+    return null;
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    console.error("create borrower failed", error);
+    return {
+      message:
+        error instanceof Error && error.message
+          ? error.message
+          : "Could not create this borrower. Nothing was saved.",
+    };
+  }
+}
