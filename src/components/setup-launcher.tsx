@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useCallback, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { completeSetupAction, type CompleteState } from "@/lib/actions/setup-complete";
 import { recordSetupErrorAction } from "@/lib/actions/setup-error";
 
@@ -61,6 +62,23 @@ export function SetupLauncher({
     null,
   );
   const [launching, setLaunching] = useState(false);
+  const router = useRouter();
+
+  /**
+   * Fetch a fresh Link token once an account is approved but others remain.
+   *
+   * A borrower with two payout accounts approved the first one and then had
+   * nowhere to go: the success branch below only renders when EVERY account is
+   * done, so the "one more to approve" message was never displayed, and the
+   * button kept the link token minted for the account they had just finished.
+   * Pressing it re-opened the same account. Nothing in the flow moved them on,
+   * so a two-account borrower could not finish without being sent a new link.
+   *
+   * The page mints a token for the next unapproved account on every load, so a
+   * refresh is all that is needed. Keyed on the state object, which useActionState
+   * replaces per submission, so this runs once per approval and cannot loop.
+   */
+  const refreshedFor = useRef<object | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
   /**
@@ -193,6 +211,13 @@ export function SetupLauncher({
     [linkToken, token],
   );
 
+  useEffect(() => {
+    if (!state || state.done) return;
+    if (refreshedFor.current === state) return;
+    refreshedFor.current = state;
+    router.refresh();
+  }, [state, router]);
+
   if (state?.done) {
     return (
       <div className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
@@ -204,6 +229,14 @@ export function SetupLauncher({
   return (
     <form action={formAction}>
       <input type="hidden" name="token" value={token} />
+      {state && !state.done && (
+        // Progress, not failure: the previous account was approved and there is
+        // another to do. Said here because the borrower has just come back from
+        // their bank and needs to know the button means the NEXT account.
+        <p className="mb-3 rounded-md bg-emerald-50 p-3 text-sm text-emerald-800">
+          {state.message}
+        </p>
+      )}
       {mode === "mock" ? (
         <>
           <div className="mb-3 rounded-md bg-amber-50 p-2 text-xs text-amber-800">
@@ -228,16 +261,17 @@ export function SetupLauncher({
           }}
           className="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
         >
-          {launching ? "Opening Plaid…" : "Connect your bank"}
+          {launching
+            ? "Opening Plaid…"
+            : state && !state.done
+              ? "Connect next account"
+              : "Connect your bank"}
         </button>
       )}
       {problem && (
         <p role="alert" className="mt-3 rounded-md bg-red-50 p-3 text-sm text-red-700">
           {problem}
         </p>
-      )}
-      {state && !state.done && (
-        <p className="mt-2 text-sm text-red-600">{state.message}</p>
       )}
     </form>
   );

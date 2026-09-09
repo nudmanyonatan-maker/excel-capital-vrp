@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { MAX_RECIPIENT_NAME } from "@/lib/borrower-setup-input";
 import { redirect } from "next/navigation";
 import { getDb, getEnv } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -61,6 +62,14 @@ export async function createBorrowerAction(fd: FormData): Promise<void> {
   const recipientName = str(fd, "recipientName");
   const account = str(fd, "recipientAccount");
   const sort = str(fd, "recipientSort");
+  // Capped for the same reason parseBankAndLimits caps it: a longer name is
+  // refused by HSBC at authorisation with no usable error, so the borrower is
+  // simply unable to connect and nobody can see why.
+  if (recipientName && recipientName.length > MAX_RECIPIENT_NAME) {
+    throw new Error(
+      `The account name must be ${MAX_RECIPIENT_NAME} characters or fewer, or some banks will refuse the authorisation without saying why. "${recipientName}" is ${recipientName.length}.`,
+    );
+  }
   if (recipientName && Boolean(account) !== Boolean(sort)) {
     throw new Error("Account number and sort code are both required");
   }
