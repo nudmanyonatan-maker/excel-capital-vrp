@@ -6,7 +6,7 @@ import { dueSchedules, lineageOf, setScheduleNextRun } from "@/lib/repo/schedule
 import { toSpec } from "@/lib/repo/schedules";
 import { getBorrower } from "@/lib/repo/borrowers";
 import { getSettings } from "@/lib/repo/settings";
-import { collectionProgress } from "@/lib/repo/payments";
+import { collectionProgress, settledProgress } from "@/lib/repo/payments";
 import { nextRunDate, isEnded, amountForRun } from "@/lib/schedule";
 import { scheduledKey } from "@/lib/idempotency";
 import { buildUniqueReference } from "@/lib/reference";
@@ -98,9 +98,16 @@ export async function runDueCollections(
 
       const spec = toSpec(schedule);
       const progress = await collectionProgress(db, schedule.borrower_id, schedule.id);
+      // Whether the loan is FINISHED is asked of settled money only. Asked of
+      // committed money, the last instalment retired the schedule the moment it
+      // was submitted, and a later rejection left the borrower short with
+      // nothing running and no screen explaining it. How much may be taken is
+      // still clamped by `progress`, so this can only hold a schedule open a
+      // cycle longer, never collect twice. See settledProgress.
+      const settled = await settledProgress(db, schedule.borrower_id, schedule.id);
 
       // Ended? Deactivate and stop.
-      if (isEnded(spec, { ...progress, onDate: dueDate })) {
+      if (isEnded(spec, { ...settled, onDate: dueDate })) {
         await setScheduleNextRun(db, schedule.id, null);
         summary.ended++;
         continue;
@@ -145,8 +152,15 @@ export async function runDueCollections(
 
       const amountMinor = amountForRun(spec, progress.collectedMinor);
       if (amountMinor <= 0) {
-        await setScheduleNextRun(db, schedule.id, null);
-        summary.ended++;
+        // Nothing to take right now. That is not the same as the loan being
+        // over: money already in flight can exhaust the total while none of it
+        // has arrived, and retiring the schedule here was the second way a
+        // later rejection left a borrower short with nothing running.
+        //
+        // The end condition above owns retirement, and it reads settled money.
+        // So skip, keep next_run_date where it is, and look again next cycle
+        // once those payments have either settled or failed.
+        summary.skipped++;
         continue;
       }
 

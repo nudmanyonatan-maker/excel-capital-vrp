@@ -189,7 +189,7 @@ describe("runAutoRetries", () => {
         borrowerId: b.id,
         amountMinor: 5000,
         reference: "REF",
-        idempotencyKey: retryKey(root, attempt),
+        idempotencyKey: retryKey(`${root}-a${attempt}`),
         retryOf: root,
         actorStaffId: null,
       });

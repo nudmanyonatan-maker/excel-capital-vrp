@@ -311,3 +311,21 @@ function yesterday(date: string): string {
   dt.setUTCDate(dt.getUTCDate() - 1);
   return dt.toISOString().slice(0, 10);
 }
+
+/**
+ * One schedule by id, active or not.
+ *
+ * Retries reach for this rather than getActiveSchedule: editing a schedule
+ * deactivates the old row and inserts a new one, so a payment being retried
+ * often points at a superseded version. Its limits are still the right ones to
+ * measure that payment against.
+ */
+export async function getScheduleById(
+  db: D1Database,
+  id: string,
+): Promise<RepaymentSchedule | null> {
+  return db
+    .prepare("SELECT * FROM repayment_schedules WHERE id = ?")
+    .bind(id)
+    .first<RepaymentSchedule>();
+}

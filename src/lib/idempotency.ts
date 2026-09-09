@@ -30,9 +30,23 @@ export function scheduledKey(
 }
 
 /** Key for retry attempt N (1-based) of an original payment. */
-export function retryKey(originalPaymentId: string, attempt: number): string {
-  if (attempt < 1) throw new Error("retry attempt must be >= 1");
-  return clamp(`rty_${originalPaymentId}_a${attempt}`);
+/**
+ * The one key for retrying one failed attempt.
+ *
+ * Keyed on the attempt being replaced, not on a count of attempts so far. The
+ * count was read separately from the query that selected the failure, so two
+ * overlapping sweeps could straddle each other's insert: the second read a
+ * count that had just increased, derived a higher attempt number, and produced a
+ * DIFFERENT key for the same failure. The UNIQUE(idempotency_key) guard then had
+ * nothing to catch and the instalment went out twice.
+ *
+ * Deriving it from failedPaymentId makes that impossible by construction. Two
+ * runs retrying the same failure always agree on the key whatever order they
+ * interleave in, and a genuine second retry replaces a different row (the first
+ * retry, once it too has failed) so it still gets a key of its own.
+ */
+export function retryKey(failedPaymentId: string): string {
+  return clamp(`rty1_${failedPaymentId}`);
 }
 
 /** Unique key for a manual one-off execution. `nonce` should be a UUID. */
