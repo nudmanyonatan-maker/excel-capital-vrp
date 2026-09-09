@@ -5,6 +5,8 @@ import { retryKey } from "@/lib/idempotency";
 import { writeAudit } from "@/lib/repo/audit";
 import { uniqueReferenceFromBase } from "@/lib/reference";
 import type { Payment } from "@/lib/types";
+import { collectionProgress } from "@/lib/repo/payments";
+import { getScheduleById, toSpec } from "@/lib/repo/schedules";
 
 export interface AutoRetrySummary {
   considered: number;
@@ -32,7 +34,7 @@ const MAX_RETRY_AGE_DAYS = 30;
  * UNIQUE(idempotency_key) double-collection guard) are enforced here too.
  *
  * Safety property (do not regress): the idempotency key is the DETERMINISTIC
- * retryKey(root, attempt), never randomised. Two concurrent cron fires that see
+ * retryKey(candidate.id), never randomised. Two concurrent cron fires that see
  * the same DB state compute the same attempt number and therefore the same key,
  * so the DB UNIQUE constraint rejects the loser as a duplicate instead of
  * double-collecting.
@@ -117,12 +119,28 @@ export async function runAutoRetries(
       continue;
     }
 
+    // Never retry more than the loan still owes.
+    //
+    // A retry reuses the amount of the attempt it replaces, and nothing checked
+    // that against the loan's remaining balance. A failed instalment retried
+    // after the rest of the loan had been collected asked the bank for money the
+    // borrower no longer owed: a GBP 100 loan could see GBP 200 in accepted
+    // payment requests. The scheduled path has always clamped this via
+    // amountForRun; retries simply never went through it.
+    const retryAmount = await remainingForRetry(db, candidate);
+    if (retryAmount <= 0) {
+      // Settled some other way, or the loan is finished. Not an error, and not
+      // something to keep reconsidering every night.
+      summary.skipped++;
+      continue;
+    }
+
     const input: CollectInput = {
       borrowerId: candidate.borrower_id,
-      amountMinor: candidate.amount_minor,
+      amountMinor: retryAmount,
       currency: candidate.currency,
-      reference: uniqueReferenceFromBase(candidate.reference ?? "ExcelPayment", retryKey(root, attempt)),
-      idempotencyKey: retryKey(root, attempt),
+      reference: uniqueReferenceFromBase(candidate.reference ?? "ExcelPayment", retryKey(candidate.id)),
+      idempotencyKey: retryKey(candidate.id),
       // Same account as the attempt being retried, never the default. See the
       // matching note in retryPaymentAction.
       consentId: candidate.consent_id,
@@ -162,4 +180,30 @@ export async function runAutoRetries(
   }
 
   return summary;
+}
+
+/**
+ * What this retry may ask for: the original amount, capped at what the loan
+ * still owes.
+ *
+ * Only 'total' loans have a ceiling to clamp against. A retry with no schedule,
+ * or on a loan that ends by date or by count, keeps its original amount, since
+ * there is no total for it to overshoot.
+ *
+ * Deliberately measured against committed money (collectionProgress), including
+ * payments still in flight, so a retry cannot be sized against a total that
+ * another in-flight payment is already claiming.
+ */
+async function remainingForRetry(db: D1Database, candidate: Payment): Promise<number> {
+  if (!candidate.schedule_id) return candidate.amount_minor;
+  const schedule = await getScheduleById(db, candidate.schedule_id);
+  if (!schedule) return candidate.amount_minor;
+  const spec = toSpec(schedule);
+  if (spec.endMode !== "total" || spec.endTotalMinor == null) return candidate.amount_minor;
+  const { collectedMinor } = await collectionProgress(
+    db,
+    candidate.borrower_id,
+    candidate.schedule_id,
+  );
+  return Math.max(0, Math.min(candidate.amount_minor, spec.endTotalMinor - collectedMinor));
 }

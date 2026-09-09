@@ -362,10 +362,54 @@ const LINEAGE_SQL = `schedule_id IN (
       )`;
 
 /** Count succeeded payments and total collected for a borrower (for schedule end logic). */
+/**
+ * Money the borrower is already committed for, including payments still in
+ * flight. Use this to decide HOW MUCH MORE may be taken.
+ *
+ * Counting in-flight payments is deliberate: a payment that has been submitted
+ * but not yet settled has left our hands, so ignoring it would let the next run
+ * collect the same instalment again.
+ */
 export async function collectionProgress(
   db: D1Database,
   borrowerId: string,
   scheduleId?: string | null,
+): Promise<{ paymentsMade: number; collectedMinor: number }> {
+  return progress(db, borrowerId, scheduleId, IN_FLIGHT_OR_SETTLED);
+}
+
+/**
+ * Money that actually arrived. Use this to decide whether the loan is FINISHED.
+ *
+ * The two questions need different answers and conflating them stopped loans
+ * early. A payment merely in flight was enough to satisfy the end condition, so
+ * the final instalment of a loan deactivated the schedule the moment it was
+ * submitted. If the bank then rejected it, nothing reactivated anything: the
+ * borrower was left short, with no active schedule, and no screen said why. Six
+ * consecutive rejections on one production borrower are what made this reachable
+ * rather than theoretical.
+ *
+ * Ending on settled money only is the conservative direction. A loan whose last
+ * payment is still in flight stays open one extra cycle, and the amount the next
+ * run may take is still clamped by collectionProgress above, so waiting cannot
+ * cause an over-collection.
+ */
+export async function settledProgress(
+  db: D1Database,
+  borrowerId: string,
+  scheduleId?: string | null,
+): Promise<{ paymentsMade: number; collectedMinor: number }> {
+  return progress(db, borrowerId, scheduleId, SETTLED_ONLY);
+}
+
+const IN_FLIGHT_OR_SETTLED = "'unknown','submitted','initiated','executed','settled'";
+const SETTLED_ONLY = "'executed','settled'";
+
+async function progress(
+  db: D1Database,
+  borrowerId: string,
+  scheduleId: string | null | undefined,
+  statuses: string,
 ): Promise<{ paymentsMade: number; collectedMinor: number }> {
   const row = await db
     .prepare(
@@ -373,7 +417,7 @@ export async function collectionProgress(
        FROM payments
        WHERE borrower_id = ?
          AND (? IS NULL OR ${LINEAGE_SQL})
-         AND status IN ('unknown','submitted','initiated','executed','settled')`,
+         AND status IN (${statuses})`,
     )
     .bind(borrowerId, scheduleId ?? null, scheduleId ?? null)
     .first<{ n: number; total: number }>();

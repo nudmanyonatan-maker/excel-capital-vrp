@@ -5,7 +5,7 @@ import { getDb, getEnv } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import type { CollectOutcome } from "@/lib/engine/collect";
 import { collectPaymentCoordinated } from "@/lib/durable/coordinated-collect";
-import { getActiveSchedule, lineageOf, setScheduleNextRun } from "@/lib/repo/schedules";
+import { getActiveSchedule, getScheduleById, lineageOf, setScheduleNextRun } from "@/lib/repo/schedules";
 import { toSpec } from "@/lib/repo/schedules";
 import { getSettings } from "@/lib/repo/settings";
 import { resolveCollectionDestination } from "@/lib/repo/destinations";
@@ -13,6 +13,7 @@ import { checkAmountAgainstConsent } from "@/lib/payment-limits";
 import { getBorrower } from "@/lib/repo/borrowers";
 import {
   collectionProgress,
+  settledProgress,
   getPayment,
   getSchedulePaymentCreatedOn,
 } from "@/lib/repo/payments";
@@ -165,7 +166,12 @@ export async function executePaymentNowAction(
       // The final instalment of a 'total' loan is a remainder, not the full
       // amount, and collecting it early must not overshoot the agreed total.
       amountMinor = amountForRun(toSpec(schedule), progress.collectedMinor);
-      if (isEnded(toSpec(schedule), { ...progress, onDate: today })) {
+      // "Already collected in full" is a claim about money that arrived, not
+      // money in flight, and it matches how the nightly sweep decides the same
+      // thing. Otherwise an operator was told a loan was complete while its last
+      // payment was still unsettled, and a rejection afterwards left it unpaid.
+      const settled = await settledProgress(db, borrowerId, schedule.id);
+      if (isEnded(toSpec(schedule), { ...settled, onDate: today })) {
         return {
           message: "This loan has already been collected in full. Nothing was charged.",
           tone: "info",
@@ -294,13 +300,40 @@ export async function retryPaymentAction(
     return { message: `Already retried ${settings.default_retry_max} times, which is the limit.`, tone: "info" };
   }
 
-  const idempotencyKey = retryKey(rootId, attempt);
+  // Never retry more than the loan still owes. A retry reuses the amount of the
+  // attempt it replaces, and on a 'total' loan whose remaining instalments were
+  // collected meanwhile that asks the bank for money the borrower no longer
+  // owes. The scheduled path clamps this via amountForRun; retries did not.
+  let retryAmount = original.amount_minor;
+  if (original.schedule_id) {
+    const schedule = await getScheduleById(db, original.schedule_id);
+    const spec = schedule ? toSpec(schedule) : null;
+    if (spec && spec.endMode === "total" && spec.endTotalMinor != null) {
+      const { collectedMinor } = await collectionProgress(
+        db,
+        original.borrower_id,
+        original.schedule_id,
+      );
+      retryAmount = Math.max(
+        0,
+        Math.min(original.amount_minor, spec.endTotalMinor - collectedMinor),
+      );
+    }
+  }
+  if (retryAmount <= 0) {
+    return {
+      message: "This loan is already collected in full, so there is nothing to retry.",
+      tone: "info",
+    };
+  }
+
+  const idempotencyKey = retryKey(original.id);
   const reference = uniqueReferenceFromBase(original.reference ?? "ExcelPayment", idempotencyKey);
   const intent = await createOrGetPaymentIntent(db, {
     borrowerId: original.borrower_id,
     scheduleId: original.schedule_id,
     kind: "retry",
-    amountMinor: original.amount_minor,
+    amountMinor: retryAmount,
     currency: original.currency,
     reference,
     idempotencyKey,
@@ -310,7 +343,7 @@ export async function retryPaymentAction(
   const result = await collectOrReportUnknown(() =>
     collectPaymentCoordinated(env, {
       borrowerId: original.borrower_id,
-      amountMinor: original.amount_minor,
+      amountMinor: retryAmount,
       currency: original.currency,
       reference,
       idempotencyKey,

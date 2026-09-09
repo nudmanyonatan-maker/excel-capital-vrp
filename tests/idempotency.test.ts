@@ -15,14 +15,27 @@ describe("scheduledKey", () => {
   });
 });
 
-// Scenario eval #3: a genuine retry is a DISTINCT attempt (new key allowed).
+// Scenario eval #3: a genuine retry is a DISTINCT attempt (new key allowed),
+// but retrying the SAME failure twice must collide however the callers race.
 describe("retryKey", () => {
-  it("differs per attempt but is stable within an attempt", () => {
-    expect(retryKey("p1", 1)).toBe(retryKey("p1", 1));
-    expect(retryKey("p1", 1)).not.toBe(retryKey("p1", 2));
+  it("is stable for one failed attempt, whoever asks and whenever", () => {
+    expect(retryKey("p1")).toBe(retryKey("p1"));
   });
-  it("rejects attempt < 1", () => {
-    expect(() => retryKey("p1", 0)).toThrow();
+
+  it("differs between the failures it replaces", () => {
+    // A retry of the first attempt and a retry of that retry are separate
+    // payments and must be allowed through as separate keys.
+    expect(retryKey("p1")).not.toBe(retryKey("p2"));
+  });
+
+  it("does not depend on how many attempts came before", () => {
+    // The old key mixed in a live COUNT of prior retries, read separately from
+    // the query that picked the failure. Two overlapping sweeps could straddle
+    // each other's insert, derive different attempt numbers for one failure, and
+    // send it twice with nothing to collide on.
+    const key = retryKey("p1");
+    expect(key).toContain("p1");
+    expect(key).not.toMatch(/_a\d+$/);
   });
 });
 
