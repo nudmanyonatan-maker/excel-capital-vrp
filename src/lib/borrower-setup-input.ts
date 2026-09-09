@@ -44,12 +44,27 @@ function parseAmount(raw: string | undefined): number | null {
  * back in minor units; the sort code comes back as six bare digits, since Plaid
  * rejects the dashed form people naturally type.
  */
+/**
+ * The longest payee name every UK institution will accept on a VRP consent.
+ *
+ * Confirmed by Plaid support (case 893544, 2026-09-09) after a borrower's HSBC
+ * authorisation failed repeatedly with only "Something went wrong" in Link: HSBC
+ * rejects a recipient name over 18 characters, and nothing in the error said so.
+ * Ours was "Excel Capital Group Ltd", 23 characters, so every HSBC borrower was
+ * unreachable and the cause was invisible from both ends.
+ */
+export const MAX_RECIPIENT_NAME = 18;
+
 export function parseBankAndLimits(raw: BankAndLimitsRaw): ParseResult {
   const errors: string[] = [];
 
   const recipientName = (raw.recipientName ?? "").trim();
   if (!recipientName) {
     errors.push("Enter the name on the account that repayments are sent to.");
+  } else if (recipientName.length > MAX_RECIPIENT_NAME) {
+    errors.push(
+      `The account name must be ${MAX_RECIPIENT_NAME} characters or fewer, or some banks will refuse the authorisation without saying why. "${recipientName}" is ${recipientName.length}.`,
+    );
   }
 
   const accountDigits = (raw.accountNumber ?? "").replace(/\D/g, "");

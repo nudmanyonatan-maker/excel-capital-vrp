@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { parseBankAndLimits } from "@/lib/borrower-setup-input";
 
 const valid = {
-  recipientName: "Excel Capital Group Ltd",
+  recipientName: "Excel Capital",
   accountNumber: "12345678",
   sortCode: "12-34-56",
   maxPaymentAmount: "500",
@@ -15,7 +15,7 @@ describe("parseBankAndLimits: happy path", () => {
     const r = parseBankAndLimits(valid);
     expect(r.errors).toEqual([]);
     expect(r.value).toMatchObject({
-      recipientName: "Excel Capital Group Ltd",
+      recipientName: "Excel Capital",
       accountNumber: "12345678",
       sortCode: "123456", // dashes stripped, as Plaid requires
       maxPaymentAmountMinor: 50_000,
