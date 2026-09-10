@@ -40,7 +40,15 @@ function encodeFrequency(input: ScheduleInput): {
   intervalDays: number | null;
   daysOfWeek: number[] | null;
 } {
-  if (input.frequency !== "daily") {
+  // "Custom, every 1 day" IS daily, so encode it as daily and keep the weekday
+  // ticks. Falling through to the branch below discarded them, and because
+  // isStoredDaily requires days_of_week to be present, the row then read back as
+  // a bare 1-day interval that ignored weekdays entirely: an operator who ticked
+  // Mon-Fri and chose "every 1 day" got collections on Saturday and Sunday, with
+  // nothing on screen saying their choice had been dropped. Every single day is
+  // still reachable, by ticking all seven.
+  const dailyByInterval = input.frequency === "custom" && (input.intervalDays ?? 0) === 1;
+  if (input.frequency !== "daily" && !dailyByInterval) {
     return {
       frequency: input.frequency as Frequency,
       intervalDays: input.intervalDays ?? null,
