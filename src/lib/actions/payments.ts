@@ -138,12 +138,34 @@ export async function executePaymentNowAction(
   const isScheduledRun =
     !(typeof overrideAmount === "string" && overrideAmount.trim()) &&
     Boolean(schedule?.next_run_date);
+  // Collecting ahead of the due date is allowed once, not repeatedly.
+  //
+  // Because a press is now treated as a run of the schedule whatever the due
+  // date, a successful one advances next_run_date to the instalment after it. A
+  // second press then collected THAT one, and a third the one after: pressing
+  // the button repeatedly walked forward through the loan, taking future
+  // instalments on demand. It happened in production, where two presses two
+  // minutes apart took a September instalment and an October one.
+  //
+  // The guard below did not stop it because the first payment had already been
+  // rejected by the bank, and rejected attempts are deliberately ignored so the
+  // due instalment can be retried the same day. That exemption is right for the
+  // instalment that is due and wrong for one that is not, so an early press
+  // counts every attempt made today, successful or not.
+  const collectingAhead = Boolean(schedule?.next_run_date && schedule.next_run_date > today);
   if (
     schedule &&
     !(typeof overrideAmount === "string" && overrideAmount.trim()) &&
-    await getSchedulePaymentCreatedOn(db, schedule.id, today)
+    await getSchedulePaymentCreatedOn(db, schedule.id, today, {
+      includeUnsuccessful: collectingAhead,
+    })
   ) {
-    return { message: "Today's payment was already sent. Nothing was charged twice.", tone: "info" };
+    return {
+      message: collectingAhead
+        ? "This borrower has already been collected from today. The next instalment is not due yet."
+        : "Today's payment was already sent. Nothing was charged twice.",
+      tone: "info",
+    };
   }
   let amountMinor: number | null = null;
   const isOneOff = typeof overrideAmount === "string" && overrideAmount.trim().length > 0;
