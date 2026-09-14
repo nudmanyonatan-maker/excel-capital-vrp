@@ -95,12 +95,20 @@ export async function getSchedulePaymentCreatedOn(
   db: D1Database,
   scheduleId: string,
   date: string,
+  opts: { includeUnsuccessful?: boolean } = {},
 ): Promise<Payment | null> {
+  // Failed and rejected attempts are normally excluded, so an operator can try
+  // again the same day after the bank turned one down. That is the right answer
+  // for the instalment that is actually due, and the wrong one for collecting
+  // ahead of the due date: see the caller in executePaymentNowAction.
+  const statusFilter = opts.includeUnsuccessful
+    ? ""
+    : "AND status NOT IN ('failed','rejected','cancelled')";
   return db
     .prepare(
       `SELECT * FROM payments
        WHERE ${LINEAGE_SQL} AND substr(created_at, 1, 10) = ?
-         AND status NOT IN ('failed','rejected','cancelled')
+         ${statusFilter}
        ORDER BY created_at DESC LIMIT 1`,
     )
     .bind(scheduleId, date)
