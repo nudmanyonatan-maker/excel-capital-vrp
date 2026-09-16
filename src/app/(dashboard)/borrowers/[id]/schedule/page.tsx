@@ -5,7 +5,8 @@ import { getDb } from "@/lib/db";
 import { getCurrentUser, hasRole } from "@/lib/auth";
 import { getBorrower } from "@/lib/repo/borrowers";
 import { getActiveSchedule, isStoredDaily, parseDaysOfWeek } from "@/lib/repo/schedules";
-import { updateScheduleAction } from "@/lib/actions/borrowers";
+import { updateScheduleFormAction } from "@/lib/actions/borrowers";
+import { ActionForm } from "@/components/action-form";
 import { fromMinorUnits } from "@/lib/money";
 
 import { WeekdayPicker } from "@/components/weekday-picker";
@@ -49,7 +50,7 @@ export default async function SchedulePage({
       </Link>
       <h1 className="mt-1 mb-6 text-2xl font-semibold tracking-tight">Repayment schedule</h1>
 
-      <form action={updateScheduleAction} className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
+      <ActionForm action={updateScheduleFormAction} className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
         <input type="hidden" name="borrowerId" value={id} />
         <div className="grid grid-cols-2 gap-4">
           <label className="block">
@@ -164,7 +165,7 @@ export default async function SchedulePage({
             Save schedule
           </SubmitButton>
         </div>
-      </form>
+      </ActionForm>
     </div>
   );
 }

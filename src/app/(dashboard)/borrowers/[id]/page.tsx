@@ -8,7 +8,8 @@ import { getActiveSchedule, isStoredDaily, parseDaysOfWeek } from "@/lib/repo/sc
 import { listPaymentsForBorrower, collectionProgress } from "@/lib/repo/payments";
 import { latestSetupLinkForBorrower } from "@/lib/repo/setup-links";
 import { getCurrentUser, hasRole } from "@/lib/auth";
-import { setBorrowerStatusAction } from "@/lib/actions/borrowers";
+import { setBorrowerStatusFormAction } from "@/lib/actions/borrowers";
+import { ActionForm } from "@/components/action-form";
 import { StatusBadge } from "@/components/status-badge";
 import {
   ExecuteNowButton,
@@ -313,7 +314,7 @@ export default async function BorrowerProfile({
             nonce={crypto.randomUUID()}
             destinations={collectableChoices}
           />
-          <form action={setBorrowerStatusAction}>
+          <ActionForm action={setBorrowerStatusFormAction}>
             <input type="hidden" name="borrowerId" value={borrower.id} />
             <input type="hidden" name="status" value={paused ? "active" : "paused"} />
             <SubmitButton
@@ -322,7 +323,7 @@ export default async function BorrowerProfile({
             >
               {paused ? "Resume collections" : "Pause collections"}
             </SubmitButton>
-          </form>
+          </ActionForm>
           {/* Archive, never delete. Refuses while collections could still run,
               because hiding a borrower does not stop taking their money. */}
           <ArchiveBorrowerButton borrowerId={borrower.id} borrowerName={borrower.legal_name} />

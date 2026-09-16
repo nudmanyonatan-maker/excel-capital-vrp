@@ -6,7 +6,8 @@ import { getBorrower } from "@/lib/repo/borrowers";
 import { listDestinations } from "@/lib/repo/destinations";
 import { unprotectString } from "@/lib/crypto";
 import { getEnv } from "@/lib/db";
-import { updateBorrowerDetailsAction } from "@/lib/actions/borrowers";
+import { updateBorrowerDetailsFormAction } from "@/lib/actions/borrowers";
+import { ActionForm } from "@/components/action-form";
 import { BankLimitsForm } from "@/components/bank-limits-form";
 
 export const dynamic = "force-dynamic";
@@ -71,8 +72,8 @@ export default async function EditBorrowerPage({
         Edit business details
       </h1>
 
-      <form
-        action={updateBorrowerDetailsAction}
+      <ActionForm
+        action={updateBorrowerDetailsFormAction}
         className="space-y-4 rounded-lg border border-slate-200 bg-white p-5"
       >
         <input type="hidden" name="borrowerId" value={id} />
@@ -124,7 +125,7 @@ export default async function EditBorrowerPage({
             Save details
           </button>
         </div>
-      </form>
+      </ActionForm>
 
       <h2 className="mt-8 mb-3 text-lg font-semibold tracking-tight">
         Bank details and payment limits
