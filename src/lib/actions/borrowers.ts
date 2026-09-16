@@ -320,6 +320,86 @@ function isRedirect(error: unknown): boolean {
   return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
 }
 
+export type FormMessage = { message: string } | null;
+
+/**
+ * Run a throwing action and hand its refusal back to the operator.
+ *
+ * Every validation failure in the actions above is a thrown Error, and a plain
+ * `<form action={...}>` has nowhere to put one: Next turns it into an unhandled
+ * server exception and the operator sees a blank "This page couldn't load. A
+ * server error occurred." page. That happened repeatedly in production, and each
+ * time the message the operator needed had already been written and simply never
+ * reached them.
+ *
+ * Success still redirects, and Next signals a redirect by throwing, so that one
+ * is re-thrown rather than reported as a failure.
+ */
+async function reportRefusal(
+  what: string,
+  run: () => Promise<void>,
+  fallback: string,
+): Promise<FormMessage> {
+  try {
+    await run();
+    return null;
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    console.error(`${what} failed`, error);
+    return {
+      message: error instanceof Error && error.message ? error.message : fallback,
+    };
+  }
+}
+
+export async function updateScheduleFormAction(
+  _prev: FormMessage,
+  fd: FormData,
+): Promise<FormMessage> {
+  // Guarded here as well as inside the action it delegates to. This wrapper is
+  // what the form actually calls, so it is its own entry point and has to stand
+  // on its own. Before reportRefusal, so an authorisation failure propagates as
+  // one rather than being shown as an ordinary validation message.
+  await requireRole("operator");
+  return reportRefusal(
+    "update schedule",
+    () => updateScheduleAction(fd),
+    "Could not save this schedule. Nothing was changed.",
+  );
+}
+
+export async function updateBorrowerDetailsFormAction(
+  _prev: FormMessage,
+  fd: FormData,
+): Promise<FormMessage> {
+  // Guarded here as well as inside the action it delegates to. This wrapper is
+  // what the form actually calls, so it is its own entry point and has to stand
+  // on its own. Before reportRefusal, so an authorisation failure propagates as
+  // one rather than being shown as an ordinary validation message.
+  await requireRole("operator");
+  return reportRefusal(
+    "update borrower details",
+    () => updateBorrowerDetailsAction(fd),
+    "Could not save these details. Nothing was changed.",
+  );
+}
+
+export async function setBorrowerStatusFormAction(
+  _prev: FormMessage,
+  fd: FormData,
+): Promise<FormMessage> {
+  // Guarded here as well as inside the action it delegates to. This wrapper is
+  // what the form actually calls, so it is its own entry point and has to stand
+  // on its own. Before reportRefusal, so an authorisation failure propagates as
+  // one rather than being shown as an ordinary validation message.
+  await requireRole("operator");
+  return reportRefusal(
+    "set borrower status",
+    () => setBorrowerStatusAction(fd),
+    "Could not change this borrower's status.",
+  );
+}
+
 export async function createBorrowerFormAction(
   _prev: CreateBorrowerState,
   fd: FormData,

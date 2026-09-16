@@ -1,7 +1,8 @@
 import { getDb } from "@/lib/db";
 import { getSettings } from "@/lib/repo/settings";
 import { getCurrentUser, hasRole } from "@/lib/auth";
-import { updateSettingsAction } from "@/lib/actions/settings";
+import { updateSettingsFormAction } from "@/lib/actions/settings";
+import { ActionForm } from "@/components/action-form";
 import { isPlaidConfigured } from "@/lib/plaid";
 import { type MailerEnv } from "@/lib/mailer";
 import { emailReach } from "@/lib/mailer/reach";
@@ -118,8 +119,8 @@ export default async function SettingsPage() {
           admin if something here needs updating.
         </p>
       ) : (
-        <form
-          action={updateSettingsAction}
+        <ActionForm
+          action={updateSettingsFormAction}
           className="space-y-5 rounded-lg border border-slate-200 bg-white p-5"
         >
           <div className="grid grid-cols-2 gap-5">
@@ -174,7 +175,7 @@ export default async function SettingsPage() {
               Save settings
             </button>
           </div>
-        </form>
+        </ActionForm>
       )}
     </div>
   );
