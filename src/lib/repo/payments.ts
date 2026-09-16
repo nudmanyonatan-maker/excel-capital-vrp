@@ -431,3 +431,45 @@ async function progress(
     .first<{ n: number; total: number }>();
   return { paymentsMade: row?.n ?? 0, collectedMinor: row?.total ?? 0 };
 }
+
+/**
+ * Free the deterministic key held by an attempt the provider never accepted.
+ *
+ * A scheduled collection's key is derived from its due date, so there is exactly
+ * one per instalment: that is what makes a double-charge impossible. But it also
+ * means the FIRST attempt for a date owns that key permanently, including an
+ * attempt the provider refused outright before creating anything.
+ *
+ * It happened in production: a GBP 0.01 collection was refused by Plaid for
+ * being below their GBP 1.00 minimum, never reached the bank, and still took the
+ * key for that day. Correcting the amount to GBP 1.00 and trying again produced
+ * the same key, collided, and was reported back as "already sent". That
+ * instalment could never be collected, and nothing said why.
+ *
+ * Releasing it is only safe when we know the provider created nothing, so the
+ * conditions are enforced in SQL rather than by the caller:
+ *   - plaid_payment_id IS NULL, so no provider payment exists to be repeated, and
+ *   - status = 'rejected', which this codebase uses only for a request the
+ *     provider refused. A payment the BANK refused is 'failed' and keeps its key,
+ *     as does anything 'unknown', where we cannot prove nothing was sent.
+ *
+ * The row keeps its history and its reason; only the key is moved aside, to a
+ * value that stays unique and is obviously not a real one.
+ */
+export async function releaseUnsentIdempotencyKey(
+  db: D1Database,
+  paymentId: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE payments
+          SET idempotency_key = 'unsent:' || id
+        WHERE id = ?
+          AND plaid_payment_id IS NULL
+          AND status = 'rejected'
+          AND idempotency_key NOT LIKE 'unsent:%'`,
+    )
+    .bind(paymentId)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}

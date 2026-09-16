@@ -17,6 +17,7 @@ import {
   insertPayment,
   markPaymentUnknown,
   setPaymentProviderResult,
+  releaseUnsentIdempotencyKey,
 } from "@/lib/repo/payments";
 import type { Payment, PaymentStatus } from "@/lib/types";
 
@@ -139,6 +140,13 @@ export async function collectPayment(
         providerRequestId: error.requestId,
         providerChecked: true,
       });
+      // The provider refused the request outright, so nothing exists at the bank
+      // to be repeated. Give the instalment's key back, or a corrected retry for
+      // the same due date collides with this row and is reported as a duplicate
+      // that was never actually sent. Guarded in SQL: see releaseUnsentIdempotencyKey.
+      if (failureStatus === "rejected") {
+        await releaseUnsentIdempotencyKey(db, payment.id);
+      }
       const updated = (await getPayment(db, payment.id)) ?? payment;
       await auditExecution(db, input, updated.id, "payment.execute.rejected", {
         reason,
