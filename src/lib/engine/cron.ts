@@ -6,7 +6,11 @@ import { dueSchedules, lineageOf, setScheduleNextRun } from "@/lib/repo/schedule
 import { toSpec } from "@/lib/repo/schedules";
 import { getBorrower } from "@/lib/repo/borrowers";
 import { getSettings } from "@/lib/repo/settings";
-import { collectionProgress, settledProgress } from "@/lib/repo/payments";
+import {
+  collectionProgress,
+  settledProgress,
+  unsentAttemptsForDueDate,
+} from "@/lib/repo/payments";
 import { nextRunDate, isEnded, amountForRun } from "@/lib/schedule";
 import { scheduledKey } from "@/lib/idempotency";
 import { buildUniqueReference } from "@/lib/reference";
@@ -167,7 +171,16 @@ export async function runDueCollections(
       // Keyed on the LINEAGE, not the row: editing a schedule inserts a new row,
       // and a row-keyed idempotency key made this morning's collection invisible
       // to tonight's sweep for the same due date.
-      const idempotencyKey = scheduledKey(schedule.borrower_id, lineageOf(schedule), dueDate);
+      // Attempts the provider refused outright do not hold their key, so this
+      // instalment gets a fresh one rather than reusing a key Plaid has already
+      // seen with different parameters. See scheduledKey.
+      const unsent = await unsentAttemptsForDueDate(db, schedule.id, dueDate);
+      const idempotencyKey = scheduledKey(
+        schedule.borrower_id,
+        lineageOf(schedule),
+        dueDate,
+        unsent,
+      );
       const reference = buildUniqueReference(settings.default_reference_format, {
         borrowerToken: (borrower.company_number || borrower.legal_name || borrower.id)
           .slice(0, 8)

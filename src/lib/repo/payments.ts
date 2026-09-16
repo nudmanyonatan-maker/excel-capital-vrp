@@ -473,3 +473,28 @@ export async function releaseUnsentIdempotencyKey(
     .run();
   return (result.meta.changes ?? 0) > 0;
 }
+
+/**
+ * How many attempts at this instalment the provider refused before creating
+ * anything, counted by the keys releaseUnsentIdempotencyKey moved aside.
+ *
+ * Used to give a corrected retry a key of its own. Only released rows count: a
+ * payment that reached the provider still holds the canonical key, so it blocks
+ * a repeat rather than advancing the counter.
+ */
+export async function unsentAttemptsForDueDate(
+  db: D1Database,
+  scheduleId: string,
+  dueDate: string,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM payments
+        WHERE ${LINEAGE_SQL}
+          AND scheduled_for = ?
+          AND idempotency_key LIKE 'unsent:%'`,
+    )
+    .bind(scheduleId, dueDate)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}

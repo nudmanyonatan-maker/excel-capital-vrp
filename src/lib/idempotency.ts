@@ -25,8 +25,28 @@ export function scheduledKey(
   borrowerId: string,
   scheduleId: string,
   dueDate: string, // YYYY-MM-DD
+  /**
+   * How many earlier attempts at this instalment the provider refused outright,
+   * creating nothing. Zero for the ordinary case, and the key is then exactly
+   * what it has always been.
+   *
+   * A key is idempotent at PLAID too, not only in our own table, and Plaid
+   * remembers it with the parameters it was first used with. So a GBP 0.01
+   * collection refused for being under their GBP 1.00 minimum burned that day's
+   * key: correcting the amount and trying again reused it with a different
+   * amount, and Plaid answered "idempotency key reused with different payment
+   * parameters". Freeing the key on our side was necessary and not sufficient,
+   * because their copy is the one that refuses.
+   *
+   * So a corrected attempt gets its own key. Still deterministic, so two runs of
+   * the same attempt still collide and cannot double-charge; it only moves on
+   * when we have proof the provider created nothing. See
+   * releaseUnsentIdempotencyKey, which is what counts these.
+   */
+  unsentAttempts = 0,
 ): string {
-  return clamp(`sch_${borrowerId}_${scheduleId}_${dueDate}`);
+  const base = `sch_${borrowerId}_${scheduleId}_${dueDate}`;
+  return clamp(unsentAttempts > 0 ? `${base}#${unsentAttempts + 1}` : base);
 }
 
 /** Key for retry attempt N (1-based) of an original payment. */
