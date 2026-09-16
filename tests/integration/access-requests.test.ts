@@ -139,6 +139,17 @@ describe("the queue", () => {
     const a = await requestAccess(env.DB, email("q1"), null);
     const b = await requestAccess(env.DB, email("q2"), null);
 
+    // Separate them in time explicitly. Both rows are written in the same
+    // millisecond often enough for this to fail at random, and the query then
+    // falls back to its `id ASC` tie-break, which is a random UUID. "Oldest
+    // first" is only a meaningful claim about requests of different ages.
+    await env.DB.prepare("UPDATE access_requests SET requested_at = ? WHERE id = ?")
+      .bind("2026-01-01T00:00:00.000Z", a.id)
+      .run();
+    await env.DB.prepare("UPDATE access_requests SET requested_at = ? WHERE id = ?")
+      .bind("2026-01-02T00:00:00.000Z", b.id)
+      .run();
+
     const pending = await listPendingRequests(env.DB);
     const ids = pending.map((r) => r.id);
     expect(ids).toContain(a.id);
