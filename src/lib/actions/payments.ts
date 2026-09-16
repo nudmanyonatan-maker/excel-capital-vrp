@@ -14,6 +14,7 @@ import { getBorrower } from "@/lib/repo/borrowers";
 import {
   collectionProgress,
   settledProgress,
+  unsentAttemptsForDueDate,
   getPayment,
   getSchedulePaymentCreatedOn,
 } from "@/lib/repo/payments";
@@ -210,12 +211,20 @@ async function executePaymentNowImpl(
   const settings = await getSettings(db);
   const { paymentsMade } = await collectionProgress(db, borrowerId, schedule?.id);
 
+  // Attempts the provider refused outright do not hold their key, so a corrected
+  // retry of the same instalment gets a fresh one rather than reusing a key
+  // Plaid has already seen with a different amount. See scheduledKey.
+  const unsentAttempts =
+    isScheduledRun && schedule
+      ? await unsentAttemptsForDueDate(db, schedule.id, schedule.next_run_date!)
+      : 0;
+
   const nonce = String(fd.get("nonce") ?? "") || newId();
   // Keyed on the schedule's LINEAGE and the date this instalment is FOR, so it
   // collides with the sweep's own key for that date however many times the
   // schedule has been edited since.
   const idempotencyKey = isScheduledRun && schedule
-    ? scheduledKey(borrowerId, lineageOf(schedule), schedule.next_run_date!)
+    ? scheduledKey(borrowerId, lineageOf(schedule), schedule.next_run_date!, unsentAttempts)
     : manualKey(borrowerId, nonce);
   const reason = String(fd.get("reason") ?? "").trim();
   const reference = isOneOff && reason
