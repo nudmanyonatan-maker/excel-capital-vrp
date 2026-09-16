@@ -61,10 +61,13 @@ describe("server action authorisation", () => {
     const payments = readFileSync(path.join(ACTIONS_DIR, "payments.ts"), "utf8");
     // Neither execute nor retry may be downgraded to viewer.
     expect(payments).not.toMatch(/requireRole\("viewer"\)/);
-    expect([...payments.matchAll(/requireRole\("(\w+)"\)/g)].map((m) => m[1])).toEqual([
-      "operator",
-      "operator",
-    ]);
+    // Asserted as "every check is operator" rather than as a fixed count: the
+    // exported actions now guard themselves as well as delegating to an
+    // implementation that guards, and counting occurrences made adding a second
+    // layer of the SAME check look like a regression.
+    const roles = [...payments.matchAll(/requireRole\("(\w+)"\)/g)].map((m) => m[1]);
+    expect(roles.length).toBeGreaterThanOrEqual(2);
+    expect([...new Set(roles)]).toEqual(["operator"]);
   });
 
   it("keeps staff and settings administration at admin", () => {

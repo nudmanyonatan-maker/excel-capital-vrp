@@ -94,7 +94,7 @@ export interface ActionResult {
 export type ActionState = ActionResult | null;
 
 /** Manual one-off collection. Amount defaults to the active schedule amount. */
-export async function executePaymentNowAction(
+async function executePaymentNowImpl(
   _prev: ActionState,
   fd: FormData,
 ): Promise<ActionState> {
@@ -280,7 +280,7 @@ export async function executePaymentNowAction(
 }
 
 /** Retry a failed payment as a distinct attempt (new idempotency key). */
-export async function retryPaymentAction(
+async function retryPaymentImpl(
   _prev: ActionState,
   fd: FormData,
 ): Promise<ActionState> {
@@ -384,4 +384,70 @@ export async function retryPaymentAction(
   revalidatePath(`/borrowers/${original.borrower_id}`);
   revalidatePath("/payments");
   return result;
+}
+
+
+/**
+ * Neither payment action may ever answer an operator with a blank page.
+ *
+ * Both already return their refusals as state, but only for the failures they
+ * anticipated. Anything thrown BEFORE that, reading settings, resolving the
+ * destination, creating the payment intent, became an unhandled server exception
+ * and the operator got "This page couldn't load. A server error occurred." with
+ * an opaque number. That happened three times in production on the same
+ * borrower, and each time it told nobody anything: not the operator, not us.
+ *
+ * These are the two buttons that move money, so the one thing worse than an
+ * ugly message is no message. The provider error is included deliberately: the
+ * people using this are the ones who can act on "amount must be at least GBP
+ * 1.00", and they cannot read a stack trace or our logs.
+ *
+ * requireRole stays inside, so a viewer is refused in words rather than by a
+ * blank page, and redirects are re-thrown because Next signals them by throwing.
+ */
+function isRedirect(error: unknown): boolean {
+  const digest = (error as { digest?: unknown } | null)?.digest;
+  return typeof digest === "string" && digest.startsWith("NEXT_REDIRECT");
+}
+
+async function neverCrash(
+  what: string,
+  run: () => Promise<ActionState>,
+): Promise<ActionState> {
+  try {
+    return await run();
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    console.error(`${what} failed`, error);
+    const detail = error instanceof Error && error.message ? error.message : String(error);
+    return {
+      message: `Nothing was sent. ${detail}`.slice(0, 500),
+      tone: "error",
+    };
+  }
+}
+
+export async function executePaymentNowAction(
+  prev: ActionState,
+  fd: FormData,
+): Promise<ActionState> {
+  // Guarded here as well as in the implementation it wraps. This wrapper is what
+  // the form actually calls, so it is its own entry point and has to stand on
+  // its own; a check only reachable through another function is the kind that
+  // quietly disappears. Inside neverCrash, so a viewer is refused in words
+  // rather than with a blank page.
+  return neverCrash("execute payment now", async () => {
+    await requireRole("operator");
+    return executePaymentNowImpl(prev, fd);
+  });
+}
+
+export async function retryPaymentAction(
+  prev: ActionState,
+  fd: FormData,
+): Promise<ActionState> {
+  return neverCrash("retry payment", async () => {
+    await requireRole("operator");
+    return retryPaymentImpl(prev, fd);
+  });
 }
