@@ -15,8 +15,22 @@
 
 const MAX_LEN = 128;
 
+/**
+ * Characters Plaid accepts in an idempotency key.
+ *
+ * Learned the hard way: a retry key was built with a "#" separator and Plaid
+ * refused the payment outright with "invalid idempotency key", which reaches an
+ * operator as a collection that simply will not go, with nothing naming the
+ * character as the cause. The keys are ours to choose, so there is no reason to
+ * use anything outside the set every provider agrees on.
+ */
+const SAFE_KEY = /^[A-Za-z0-9_-]+$/;
+
 function clamp(key: string): string {
   if (key.length > MAX_LEN) throw new Error(`idempotency key too long: ${key.length}`);
+  if (!SAFE_KEY.test(key)) {
+    throw new Error(`idempotency key has characters a provider may reject: ${key}`);
+  }
   return key;
 }
 
@@ -46,7 +60,7 @@ export function scheduledKey(
   unsentAttempts = 0,
 ): string {
   const base = `sch_${borrowerId}_${scheduleId}_${dueDate}`;
-  return clamp(unsentAttempts > 0 ? `${base}#${unsentAttempts + 1}` : base);
+  return clamp(unsentAttempts > 0 ? `${base}_r${unsentAttempts + 1}` : base);
 }
 
 /** Key for retry attempt N (1-based) of an original payment. */
