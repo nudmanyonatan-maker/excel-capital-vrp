@@ -142,7 +142,10 @@ export function SetupLauncher({
       try {
         sessionStorage.setItem(
           SETUP_RESUME_KEY,
-          JSON.stringify({ linkToken, token }),
+          // Stamped so the return page can tell a fresh handoff from a stale
+          // one. A Plaid link token is only valid for four hours, and a stored
+          // entry outlives the tab it was written in.
+          JSON.stringify({ linkToken, token, storedAt: Date.now() }),
         );
       } catch {
         // Private browsing can refuse storage. The in-page flow still works; only

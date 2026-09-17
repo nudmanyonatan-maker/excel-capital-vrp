@@ -39,12 +39,37 @@ export function SetupResume() {
     // render; deferring by a microtask keeps the one-shot read out of that path.
     void (async () => {
     await Promise.resolve();
-    let stored: { linkToken?: string; token?: string } | null = null;
+    let stored: { linkToken?: string; token?: string; storedAt?: number } | null = null;
     try {
       const raw = sessionStorage.getItem(SETUP_RESUME_KEY);
       stored = raw ? JSON.parse(raw) : null;
+      // Consumed on read, before Link is created, not after it succeeds.
+      //
+      // A bank redirect can only be processed once: the oauth_state_id is in the
+      // URL, and Plaid refuses a second attempt with
+      // OAUTH_STATE_ID_ALREADY_PROCESSED. Clearing this only in onSuccess meant
+      // a borrower who refreshed this page, or reached it again with the back
+      // button, re-ran the whole handoff with the same stored token and the same
+      // redirect URI, and was shown a failure for an authorisation that had
+      // usually already worked.
+      //
+      // Removing it here makes that impossible. A reload now falls into the
+      // "reopen your setup link" path below, which mints a fresh token, rather
+      // than replaying a redirect the provider has already consumed.
+      sessionStorage.removeItem(SETUP_RESUME_KEY);
     } catch {
       stored = null;
+    }
+
+    // A link token is valid for four hours. Past that, re-creating Link with it
+    // fails as INVALID_LINK_TOKEN, which reads to the borrower as though their
+    // bank refused them. Say the true thing instead.
+    const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+    if (stored?.storedAt && Date.now() - stored.storedAt > FOUR_HOURS_MS) {
+      setProblem(
+        "This link has expired. Please reopen the setup link Excel Capital sent you and try again. If your bank already confirmed, contact Excel Capital and they can check.",
+      );
+      return;
     }
 
     if (!stored?.linkToken || !stored.token) {
@@ -62,11 +87,7 @@ export function SetupResume() {
         token: stored!.linkToken!,
         receivedRedirectUri: window.location.href,
         onSuccess: () => {
-          try {
-            sessionStorage.removeItem(SETUP_RESUME_KEY);
-          } catch {
-            /* nothing to clean up */
-          }
+          // Nothing to clean up: the stored handoff was consumed on read.
           formRef.current?.requestSubmit();
         },
         onExit: (err) => {
