@@ -165,3 +165,58 @@ describe("suggestCeilings", () => {
     expect(suggestCeilings(-100, "weekly").singleMinor).toBeNull();
   });
 });
+
+/**
+ * A real borrower was set to 110 payments of GBP 1,193.40 after a GBP 1 test
+ * collection. The screen said GBP 131,273 still to collect, because it
+ * subtracted money taken from count x amount. The engine stops on the COUNT, so
+ * it would have stopped GBP 1,192.40 short and nothing on the page said so.
+ */
+describe("a count schedule where a payment was not the standard amount", () => {
+  const schedule = {
+    amount_minor: 119_340,
+    end_mode: "count" as const,
+    end_count: 110,
+    end_total_minor: null,
+    end_date: null,
+  };
+
+  it("counts what is left in payments, not in money already taken", () => {
+    const p = loanProgress({
+      // The GBP 1 test counts as one of the 110.
+      schedule: schedule as never,
+      collectedMinor: 100,
+      paymentsMade: 1,
+    });
+    expect(p.paymentsLeft).toBe(109);
+    // 109 x 1,193.40, what the schedule will really collect from here.
+    expect(p.remainingMinor).toBe(109 * 119_340);
+  });
+
+  it("does not promise money the count will never reach", () => {
+    const p = loanProgress({ schedule: schedule as never, collectedMinor: 100, paymentsMade: 1 });
+    // The old sum was target - collected, which overstated it by the shortfall.
+    expect(p.remainingMinor).not.toBe(110 * 119_340 - 100);
+    expect(p.remainingMinor).toBeLessThan(110 * 119_340 - 100);
+  });
+
+  it("is unchanged when every payment was the standard amount", () => {
+    const p = loanProgress({
+      schedule: schedule as never,
+      collectedMinor: 10 * 119_340,
+      paymentsMade: 10,
+    });
+    expect(p.paymentsLeft).toBe(100);
+    expect(p.remainingMinor).toBe(100 * 119_340);
+  });
+
+  it("reaches zero once the count is done", () => {
+    const p = loanProgress({
+      schedule: schedule as never,
+      collectedMinor: 110 * 119_340,
+      paymentsMade: 110,
+    });
+    expect(p.paymentsLeft).toBe(0);
+    expect(p.remainingMinor).toBe(0);
+  });
+});
