@@ -64,9 +64,28 @@ export function loanProgress(input: {
     return { ...base, targetMinor: null, remainingMinor: null, paymentsLeft: null, percent: null };
   }
 
-  const remainingMinor = Math.max(0, targetMinor - collectedMinor);
-  const paymentsLeft =
-    schedule.amount_minor > 0 ? Math.ceil(remainingMinor / schedule.amount_minor) : null;
+  // On a COUNT schedule, what is still to collect follows the payments that are
+  // left, not the money.
+  //
+  // Subtracting money collected from count x amount assumes every payment is the
+  // standard amount, and the moment one is not, a GBP 1 test, a late fee, a
+  // one-off, the figure becomes unreachable: the engine stops on the count
+  // having collected less. It always errs optimistically, so a shortfall reads
+  // as money still to come.
+  //
+  // A real borrower was set to 110 payments of GBP 1,193.40 after a GBP 1 test.
+  // The screen said GBP 131,273 still to collect; the schedule would have
+  // stopped GBP 1,192.40 short, and nothing on the page said so.
+  let remainingMinor: number;
+  let paymentsLeft: number | null;
+  if (schedule.end_mode === "count" && schedule.end_count != null) {
+    paymentsLeft = Math.max(0, schedule.end_count - paymentsMade);
+    remainingMinor = paymentsLeft * schedule.amount_minor;
+  } else {
+    remainingMinor = Math.max(0, targetMinor - collectedMinor);
+    paymentsLeft =
+      schedule.amount_minor > 0 ? Math.ceil(remainingMinor / schedule.amount_minor) : null;
+  }
 
   return {
     ...base,
