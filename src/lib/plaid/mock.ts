@@ -1,4 +1,5 @@
 import { webhookDeliveryId } from "./delivery-id";
+import { PlaidApiError } from "./real";
 import type {
   PlaidClient,
   RecipientInput,
@@ -55,7 +56,65 @@ export class MockPlaidClient implements PlaidClient {
     return { consentId, status: "AUTHORISED" };
   }
 
+  /**
+   * Remembers every key it has accepted, with the parameters it saw, exactly as
+   * Plaid does. Per instance, so each test starts clean.
+   */
+  private readonly seenKeys = new Map<string, string>();
+
+  /**
+   * Refuses what the real Plaid refuses.
+   *
+   * This mock used to accept anything: any amount, any key, any character, the
+   * same key twice with different amounts. So every one of Plaid's ordinary
+   * refusals was invisible until it reached production, and three of them did,
+   * one after another, on the same borrower over two days:
+   *
+   *   - a GBP 0.01 collection, under Plaid's GBP 1.00 minimum
+   *   - the corrected GBP 1.00 retry, reusing that instalment's key with a
+   *     different amount
+   *   - the new key for it, built with a "#" the provider will not accept
+   *
+   * Each one cost a round trip with the operator and told them nothing. A mock
+   * that accepts everything tests only that we can construct a request, which is
+   * never the part that breaks.
+   */
   async executePayment(input: ExecutePaymentInput): Promise<ExecutePaymentResult> {
+    if (!/^[A-Za-z0-9_-]+$/.test(input.idempotencyKey)) {
+      throw new PlaidApiError(
+        "INVALID_FIELD",
+        "invalid idempotency key",
+        400,
+        "mock-request",
+      );
+    }
+    if (input.idempotencyKey.length > 128) {
+      throw new PlaidApiError("INVALID_FIELD", "idempotency key too long", 400, "mock-request");
+    }
+    if (input.amountMinor < 100) {
+      throw new PlaidApiError(
+        "INVALID_FIELD",
+        "amount.value must be >= 100 denominated in the smallest unit of currency (e.g \u00a31.00 or \u20ac1.00)",
+        400,
+        "mock-request",
+      );
+    }
+
+    // Plaid ties a key to the parameters it was first used with: the same key
+    // again with the same parameters is the idempotent replay that keys exist
+    // for, and with different ones is an error rather than a second payment.
+    const fingerprint = `${input.amountMinor}:${input.currency ?? "GBP"}:${input.reference ?? ""}`;
+    const seen = this.seenKeys.get(input.idempotencyKey);
+    if (seen !== undefined && seen !== fingerprint) {
+      throw new PlaidApiError(
+        "INVALID_FIELD",
+        "idempotency key reused with different payment parameters",
+        400,
+        "mock-request",
+      );
+    }
+    this.seenKeys.set(input.idempotencyKey, fingerprint);
+
     return {
       paymentId: `mock-payment-${hash(input.idempotencyKey)}`,
       status: "PAYMENT_STATUS_INITIATED",
