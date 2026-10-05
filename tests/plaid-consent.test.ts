@@ -77,6 +77,17 @@ describe("createConsent wire format", () => {
     ]);
   });
 
+  it("defaults to CONSENT alignment, the only one Monzo accepts", async () => {
+    // Plaid: "If the institution is Monzo, only CONSENT alignments are
+    // supported." A CALENDAR default refused every Monzo borrower with
+    // PAYMENT_CONSENT_INVALID_CONSTRAINTS.
+    const cap = captureFetch();
+    const { periodicAlignment: _unset, ...unaligned } = fullConstraints;
+    await client.createConsent("recipient-1", "EXCELCAP", unaligned);
+
+    expect(cap.body().constraints.periodic_amounts[0].alignment).toBe("CONSENT");
+  });
+
   it("sends valid_date_time when a window is configured", async () => {
     const cap = captureFetch();
     await client.createConsent("recipient-1", "EXCELCAP", fullConstraints);

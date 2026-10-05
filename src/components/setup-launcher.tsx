@@ -45,6 +45,45 @@ declare global {
 
 const PLAID_SCRIPT = "https://cdn.plaid.com/link/v2/stable/link-initialize.js";
 
+/**
+ * Send the provider's own account of a failure back to us.
+ *
+ * A console line helps precisely nobody: it is on the borrower's phone.
+ * Recording it against the borrower is the difference between reading the error
+ * code and guessing from a screenshot someone took of an error box.
+ * Deliberately fire-and-forget with its own catch, because failing to report a
+ * failure must not become a second failure the borrower sees.
+ *
+ * Shared with /setup/complete, where a bank that sends the borrower away
+ * (Lloyds, HSBC, most of the big ones) reports its result.
+ */
+export function reportSetupError(
+  token: string,
+  err: PlaidError | null,
+  metadata?: PlaidMetadata,
+): void {
+  try {
+    const payload = new FormData();
+    payload.set("token", token);
+    if (err?.error_code) payload.set("errorCode", err.error_code);
+    if (err?.error_type) payload.set("errorType", err.error_type);
+    if (err?.error_message) payload.set("errorMessage", err.error_message);
+    if (err?.display_message) payload.set("displayMessage", err.display_message);
+    if (metadata?.institution?.name) {
+      payload.set("institutionName", metadata.institution.name);
+    }
+    if (metadata?.institution?.institution_id) {
+      payload.set("institutionId", metadata.institution.institution_id);
+    }
+    if (metadata?.link_session_id) payload.set("linkSessionId", metadata.link_session_id);
+    if (metadata?.request_id) payload.set("requestId", metadata.request_id);
+    if (metadata?.status) payload.set("status", metadata.status);
+    void recordSetupErrorAction(payload).catch(() => {});
+  } catch {
+    // Reporting is best effort by design.
+  }
+}
+
 /** Shared with the /setup/complete page, which resumes the flow after a bank redirect. */
 export const SETUP_RESUME_KEY = "excel-capital-setup-resume";
 
@@ -103,38 +142,8 @@ export function SetupLauncher({
         setLaunching(false);
       };
 
-      /**
-       * Send the provider's own account of the failure back to us.
-       *
-       * The console line above helps precisely nobody: it is on the borrower's
-       * phone. Recording it against the borrower is the difference between
-       * reading the error code and guessing from a screenshot someone took of
-       * an error box. Deliberately fire-and-forget with its own catch, because
-       * failing to report a failure must not become a second failure the
-       * borrower sees.
-       */
-      const report = (err: PlaidError | null, metadata?: PlaidMetadata) => {
-        try {
-          const payload = new FormData();
-          payload.set("token", token);
-          if (err?.error_code) payload.set("errorCode", err.error_code);
-          if (err?.error_type) payload.set("errorType", err.error_type);
-          if (err?.error_message) payload.set("errorMessage", err.error_message);
-          if (err?.display_message) payload.set("displayMessage", err.display_message);
-          if (metadata?.institution?.name) {
-            payload.set("institutionName", metadata.institution.name);
-          }
-          if (metadata?.institution?.institution_id) {
-            payload.set("institutionId", metadata.institution.institution_id);
-          }
-          if (metadata?.link_session_id) payload.set("linkSessionId", metadata.link_session_id);
-          if (metadata?.request_id) payload.set("requestId", metadata.request_id);
-          if (metadata?.status) payload.set("status", metadata.status);
-          void recordSetupErrorAction(payload).catch(() => {});
-        } catch {
-          // Reporting is best effort by design.
-        }
-      };
+      const report = (err: PlaidError | null, metadata?: PlaidMetadata) =>
+        reportSetupError(token, err, metadata);
 
       // Banks take the borrower away to their own site and send them back to
       // /setup/complete. Link can only be resumed there if it is given the SAME

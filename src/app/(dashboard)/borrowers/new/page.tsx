@@ -161,16 +161,6 @@ export default async function NewBorrowerPage() {
             </select>
           </label>
           <Field label="Ceiling across the whole period (£)" name="periodicMaxAmount" type="number" required placeholder="2400.00" />
-          <label className="block">
-            <span className="text-sm font-medium text-slate-700">Alignment</span>
-            <select
-              name="consentAlignment"
-              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
-            >
-              <option value="CALENDAR">Calendar</option>
-              <option value="CONSENT">Consent</option>
-            </select>
-          </label>
           <Field label="Valid from" name="consentValidFrom" type="datetime-local" />
           <Field label="Valid to" name="consentValidTo" type="datetime-local" />
         </Section>

@@ -1,5 +1,6 @@
 import type { Consent, ConsentStatus } from "@/lib/types";
 import { newId } from "@/lib/ids";
+import { CONSENT_PERIOD_ALIGNMENT } from "@/lib/plaid/types";
 
 /**
  * The borrower's PRIMARY mandate: the one belonging to their default account.
@@ -132,13 +133,17 @@ export interface ConsentLimits {
   currency?: string;
   maxPaymentAmountMinor?: number | null;
   period?: string | null;
-  periodicAlignment?: string | null;
   periodicMaxAmountMinor?: number | null;
   validFrom?: string | null;
   validTo?: string | null;
 }
 
-/** Create a pending consent capturing the intended limits (before Plaid auth). */
+/**
+ * Create a pending consent capturing the intended limits (before Plaid auth).
+ *
+ * Alignment is not a choice the caller gets: it is always CONSENT, because that
+ * is the only one Monzo accepts and the bank is picked after this row exists.
+ */
 export async function createPendingConsent(
   db: D1Database,
   borrowerId: string,
@@ -173,7 +178,7 @@ export async function createPendingConsent(
       limits.currency ?? "GBP",
       limits.maxPaymentAmountMinor ?? null,
       limits.period ?? null,
-      limits.periodicAlignment ?? null,
+      CONSENT_PERIOD_ALIGNMENT,
       limits.periodicMaxAmountMinor ?? null,
       limits.validFrom ?? null,
       limits.validTo ?? null,
@@ -376,6 +381,34 @@ export async function updateUnauthorisedConsentLimits(
     )
     .run();
   return { updated: (result.meta.changes ?? 0) > 0, needsReapproval: detach };
+}
+
+/**
+ * Move a pending mandate written the old way onto CONSENT alignment.
+ *
+ * A mandate already sent to Plaid with CALENDAR alignment cannot be fixed in
+ * place: Plaid fixes constraints when the consent is created. So its Plaid id
+ * is dropped too, and the next provisioning creates a replacement the borrower
+ * can approve at Monzo. Only call this once Plaid has confirmed the old one was
+ * never approved, or it would orphan a live mandate.
+ *
+ * Guarded on the alignment, so of two overlapping page loads only the first
+ * detaches; the second finds the row already moved and leaves the replacement
+ * the first one attached. Returns whether this call changed the row.
+ */
+export async function realignPendingConsent(db: D1Database, id: string): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE consents
+          SET periodic_alignment = ?,
+              plaid_consent_id = NULL,
+              plaid_consent_id_hash = NULL,
+              raw_constraints = NULL
+        WHERE id = ? AND status = 'pending' AND COALESCE(periodic_alignment, '') <> ?`,
+    )
+    .bind(CONSENT_PERIOD_ALIGNMENT, id, CONSENT_PERIOD_ALIGNMENT)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
 }
 
 /**
