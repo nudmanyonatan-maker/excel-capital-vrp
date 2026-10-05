@@ -565,6 +565,29 @@ Behaviour:
    product for this use case; ask them to confirm that specific flow in writing
    and keep it on file.
 
+3. **Period alignment is always CONSENT (2026-10-05).** Plaid's consent/create
+   reference: "If the institution is Monzo, only CONSENT alignments are
+   supported." Every mandate used to be CALENDAR, so every borrower who chose
+   Monzo was refused with `PAYMENT_CONSENT_INVALID_CONSTRAINTS` (ten times across
+   three borrowers, 11 Sep to 5 Oct). The consent exists before the borrower
+   picks a bank, so it has to be the alignment every bank takes, and the
+   operator no longer chooses it. Pending mandates created the old way are
+   swapped for a CONSENT one the next time the borrower opens their link, but
+   only after Plaid confirms the old one was never approved (audit row
+   `consent.reissued`). Mandates already approved are untouched; they work.
+
+## Reading a borrower's failed bank connection
+
+The borrower page shows the last `setup.link_failed` entry: Plaid's error code,
+the bank, and the Plaid session id. Quote the session id to Plaid support.
+
+- `PAYMENT_CONSENT_INVALID_CONSTRAINTS` at Monzo: a mandate from before the
+  alignment fix. Send a fresh setup link; opening it reissues the mandate.
+- `PAYMENT_CONSENT_CANCELLED`: the borrower backed out at their bank.
+- Nothing recorded, but the borrower saw "Something went wrong": before
+  2026-10-05 the page a bank returns the borrower to (`/setup/complete`, used by
+  Lloyds, HSBC and most large banks) did not record failures. It does now.
+
 ## Going live, in order
 
 Run `./scripts/prod-preflight.sh` at any point. It reports what production is

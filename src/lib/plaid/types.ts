@@ -6,6 +6,20 @@ export interface RecipientInput {
   sortCode?: string | null;
 }
 
+/**
+ * Where a mandate's spending period starts: on the day it was approved.
+ *
+ * The only alignment every bank accepts. Plaid: "If the institution is Monzo,
+ * only CONSENT alignments are supported." We used CALENDAR, and every borrower
+ * who chose Monzo was refused with PAYMENT_CONSENT_INVALID_CONSTRAINTS. The
+ * consent is created before the borrower picks a bank, so there is no way to
+ * choose per bank: it has to be the one they all take.
+ *
+ * Nothing here depends on the choice. The bank enforces the per-period cap;
+ * we never count spending against it ourselves.
+ */
+export const CONSENT_PERIOD_ALIGNMENT = "CONSENT";
+
 export interface ConsentConstraints {
   currency: string; // e.g. "GBP"
   maxPaymentAmountMinor?: number | null;

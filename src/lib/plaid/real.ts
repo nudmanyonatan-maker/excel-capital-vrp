@@ -1,4 +1,5 @@
 import { webhookDeliveryId } from "./delivery-id";
+import { CONSENT_PERIOD_ALIGNMENT } from "./types";
 import type {
   PlaidClient,
   RecipientInput,
@@ -138,7 +139,7 @@ export class RealPlaidClient implements PlaidClient {
             value: minorToMajor(constraints.periodicMaxAmountMinor),
           },
           interval: constraints.period,
-          alignment: constraints.periodicAlignment ?? "CALENDAR",
+          alignment: constraints.periodicAlignment ?? CONSENT_PERIOD_ALIGNMENT,
         },
       ],
     };

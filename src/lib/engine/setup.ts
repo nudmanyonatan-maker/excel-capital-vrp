@@ -1,4 +1,4 @@
-import type { PlaidClient } from "@/lib/plaid";
+import { CONSENT_PERIOD_ALIGNMENT, type PlaidClient } from "@/lib/plaid";
 import { setRecipientPlaidId } from "@/lib/repo/recipients";
 import { listDestinations } from "@/lib/repo/destinations";
 import { destinationLabel } from "@/lib/destinations";
@@ -7,6 +7,7 @@ import {
   attachPlaidConsent,
   createPendingConsent,
   getConsent,
+  realignPendingConsent,
   setConsentPlaidHash,
   setConsentRecipient,
 } from "@/lib/repo/consents";
@@ -102,7 +103,6 @@ export async function provisionLinkToken(
       currency: replaced.currency,
       maxPaymentAmountMinor: replaced.max_payment_amount_minor,
       period: replaced.period,
-      periodicAlignment: replaced.periodic_alignment,
       periodicMaxAmountMinor: replaced.periodic_max_amount_minor,
       validFrom: replaced.valid_from,
       validTo: elapsed ? null : replaced.valid_to,
@@ -120,6 +120,26 @@ export async function provisionLinkToken(
     // Legacy row from before mandates recorded their account. Bind it now, so the
     // destination of anything collected against it is knowable.
     await setConsentRecipient(db, consent.id, recipient.id);
+  }
+
+  // 2b. A mandate written before CONSENT alignment was the rule. Monzo refuses
+  // it outright, so a borrower who banks there could never get past this page,
+  // and reopening the link handed them the same refused mandate again.
+  if (
+    consent.periodic_alignment !== CONSENT_PERIOD_ALIGNMENT &&
+    (await safeToReissue(plaid, encryptionKey, consent))
+  ) {
+    const hadPlaidConsent = consent.plaid_consent_id != null;
+    if (await realignPendingConsent(db, consent.id) && hadPlaidConsent) {
+      await writeAudit(db, {
+        actorStaffId: null,
+        action: "consent.reissued",
+        entityType: "borrower",
+        entityId: borrowerId,
+        metadata: { consentId: consent.id, reason: "consent_alignment_for_monzo" },
+      });
+    }
+    consent = (await getConsent(db, consent.id)) ?? consent;
   }
 
   // 3. Plaid consent
@@ -187,6 +207,30 @@ export async function confirmConsent(
   const plaintext = await decryptString(consent.plaid_consent_id, encryptionKey);
   const r = await plaid.getConsent(plaintext);
   return { status: r.status };
+}
+
+/**
+ * Whether a pending mandate can be swapped for a new one without orphaning it.
+ *
+ * Only when the bank confirms it was never approved. An approved one we have not
+ * recorded yet is still a live mandate, and dropping its id would leave the bank
+ * ready to pay against something we no longer track. If Plaid cannot be asked,
+ * keep it: every bank except Monzo accepts the old mandate, so the borrower is
+ * no worse off than before and the next load asks again.
+ */
+async function safeToReissue(
+  plaid: PlaidClient,
+  encryptionKey: string,
+  consent: Consent,
+): Promise<boolean> {
+  if (!consent.plaid_consent_id) return true;
+  try {
+    const { status } = await confirmConsent(plaid, encryptionKey, consent);
+    return status !== "AUTHORISED" && status !== "AUTHORIZED";
+  } catch (error) {
+    console.error("could not check mandate before reissuing it", consent.id, error);
+    return false;
+  }
 }
 
 /** Move any active schedule from a superseded mandate onto its replacement. */

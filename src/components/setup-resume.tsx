@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { completeSetupAction, type CompleteState } from "@/lib/actions/setup-complete";
-import { SETUP_RESUME_KEY } from "@/components/setup-launcher";
+import { SETUP_RESUME_KEY, reportSetupError } from "@/components/setup-launcher";
 
 const PLAID_SCRIPT = "https://cdn.plaid.com/link/v2/stable/link-initialize.js";
 
@@ -90,9 +90,14 @@ export function SetupResume() {
           // Nothing to clean up: the stored handoff was consumed on read.
           formRef.current?.requestSubmit();
         },
-        onExit: (err) => {
+        onExit: (err, metadata) => {
           if (!err) return;
           console.error("plaid oauth resume failed", err);
+          // This is where a bank that sends the borrower away reports its
+          // result, and it was the one failure path that recorded nothing. A
+          // Lloyds borrower saw "Something went wrong" here and the audit log
+          // had no trace of it, so there was no error code to act on.
+          reportSetupError(stored!.token!, err, metadata);
           setProblem(
             err.display_message ||
               err.error_message ||

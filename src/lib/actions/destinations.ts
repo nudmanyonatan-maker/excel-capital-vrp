@@ -106,7 +106,6 @@ export async function addDestinationAction(
     maxPaymentAmountMinor: v.maxPaymentAmountMinor,
     periodicMaxAmountMinor: v.periodicMaxAmountMinor,
     period: v.period,
-    periodicAlignment: "CALENDAR",
     validTo: v.validTo,
   });
 

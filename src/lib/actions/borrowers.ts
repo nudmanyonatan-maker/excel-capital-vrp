@@ -193,7 +193,6 @@ export async function createBorrowerAction(fd: FormData): Promise<void> {
     currency: "GBP",
     maxPaymentAmountMinor: money(fd, "maxPaymentAmount"),
     period: str(fd, "consentPeriod"),
-    periodicAlignment: str(fd, "consentAlignment"),
     periodicMaxAmountMinor: money(fd, "periodicMaxAmount"),
     validFrom: str(fd, "consentValidFrom"),
     validTo: str(fd, "consentValidTo"),
