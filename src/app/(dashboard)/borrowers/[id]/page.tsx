@@ -8,6 +8,7 @@ import { getActiveSchedule, isStoredDaily, parseDaysOfWeek } from "@/lib/repo/sc
 import { listPaymentsForBorrower, collectionProgress } from "@/lib/repo/payments";
 import { latestSetupLinkForBorrower } from "@/lib/repo/setup-links";
 import { getCurrentUser, hasRole } from "@/lib/auth";
+import { maskAccount, maskSortCode, payoutChoicesFor } from "@/lib/payout-accounts";
 import { setBorrowerStatusFormAction } from "@/lib/actions/borrowers";
 import { ActionForm } from "@/components/action-form";
 import { StatusBadge } from "@/components/status-badge";
@@ -173,6 +174,10 @@ export default async function BorrowerProfile({
       };
     }),
   );
+
+  const payoutChoices = canOperate && user
+    ? await payoutChoicesFor(db, user, env.APP_ENCRYPTION_KEY)
+    : [];
 
   // Only accounts that can actually take money are offerable, so an operator is
   // never presented with a choice the bank would refuse.
@@ -356,6 +361,7 @@ export default async function BorrowerProfile({
             <DestinationsPanel
               borrowerId={borrower.id}
               rows={destinationRows}
+              choices={payoutChoices}
               combined={combinedWarning}
             />
           ) : (
@@ -470,10 +476,4 @@ export default async function BorrowerProfile({
   );
 }
 
-function maskAccount(value: string | null): string | null {
-  return value ? `••••${value.replace(/\D/g, "").slice(-4)}` : null;
-}
 
-function maskSortCode(value: string | null): string | null {
-  return value ? `••-••-${value.replace(/\D/g, "").slice(-2)}` : null;
-}

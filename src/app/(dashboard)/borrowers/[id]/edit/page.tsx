@@ -9,6 +9,7 @@ import { getEnv } from "@/lib/db";
 import { updateBorrowerDetailsFormAction } from "@/lib/actions/borrowers";
 import { ActionForm } from "@/components/action-form";
 import { BankLimitsForm } from "@/components/bank-limits-form";
+import { maskAccount, maskSortCode, payoutChoicesFor } from "@/lib/payout-accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -58,8 +59,19 @@ export default async function EditBorrowerPage({
   const recipient = target?.recipient ?? null;
   const consent = target?.consent ?? null;
   const otherAccounts = Math.max(0, destinations.length - 1);
-  const accountNumber = await unprotectString(recipient?.account_number, env.APP_ENCRYPTION_KEY);
-  const sortCode = await unprotectString(recipient?.sort_code, env.APP_ENCRYPTION_KEY);
+  const payoutChoices = await payoutChoicesFor(db, user, env.APP_ENCRYPTION_KEY);
+  // Only an account typed in before the approved list needs describing here;
+  // one chosen from the list is already preselected in the picker. Masked,
+  // because nobody needs the full number to recognise it.
+  const current =
+    recipient && !recipient.payout_account_id
+      ? `${recipient.name} (${[
+          maskAccount(await unprotectString(recipient.account_number, env.APP_ENCRYPTION_KEY)),
+          maskSortCode(await unprotectString(recipient.sort_code, env.APP_ENCRYPTION_KEY)),
+        ]
+          .filter(Boolean)
+          .join(" / ")})`
+      : null;
   const major = (minor: number | null | undefined) =>
     minor == null ? "" : (minor / 100).toFixed(2);
 
@@ -144,10 +156,10 @@ export default async function EditBorrowerPage({
       <BankLimitsForm
         borrowerId={id}
         locked={consent?.status === "authorized"}
+        choices={payoutChoices}
+        current={current}
         defaults={{
-          recipientName: recipient?.name ?? "",
-          accountNumber: accountNumber ?? "",
-          sortCode: sortCode ?? "",
+          payoutAccountId: recipient?.payout_account_id ?? "",
           maxPaymentAmount: major(consent?.max_payment_amount_minor),
           periodicMaxAmount: major(consent?.periodic_max_amount_minor),
           consentPeriod: consent?.period ?? "",

@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { MAX_RECIPIENT_NAME } from "@/lib/borrower-setup-input";
 import { redirect } from "next/navigation";
 import { getDb, getEnv } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -22,7 +21,7 @@ import { consentBelongsToBorrower } from "@/lib/repo/destinations";
 import { createPendingConsent } from "@/lib/repo/consents";
 import { toMinorUnits } from "@/lib/money";
 import type { BorrowerStatus, EndMode, Frequency } from "@/lib/types";
-import { protectString } from "@/lib/crypto";
+import { choosePayoutAccount, recipientFieldsFrom } from "@/lib/payout-accounts";
 
 function str(fd: FormData, key: string): string | null {
   const v = fd.get(key);
@@ -59,26 +58,11 @@ export async function createBorrowerAction(fd: FormData): Promise<void> {
   if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
     throw new Error("Contact email is invalid");
   }
-  const recipientName = str(fd, "recipientName");
-  const account = str(fd, "recipientAccount");
-  const sort = str(fd, "recipientSort");
-  // Capped for the same reason parseBankAndLimits caps it: a longer name is
-  // refused by HSBC at authorisation with no usable error, so the borrower is
-  // simply unable to connect and nobody can see why.
-  if (recipientName && recipientName.length > MAX_RECIPIENT_NAME) {
-    throw new Error(
-      `The account name must be ${MAX_RECIPIENT_NAME} characters or fewer, or some banks will refuse the authorisation without saying why. "${recipientName}" is ${recipientName.length}.`,
-    );
-  }
-  if (recipientName && Boolean(account) !== Boolean(sort)) {
-    throw new Error("Account number and sort code are both required");
-  }
-  if (account && !/^\d{8}$/.test(account.replace(/\s/g, ""))) {
-    throw new Error("Account number must contain 8 digits");
-  }
-  if (sort && !/^\d{6}$/.test(sort.replace(/\D/g, ""))) {
-    throw new Error("Sort code must contain 6 digits");
-  }
+  // Where the repayments go is CHOSEN from the approved list, never typed. A
+  // free-text account number let anyone who could onboard a borrower have that
+  // borrower's repayments collected into an account of their own.
+  const payout = await choosePayoutAccount(db, user, str(fd, "payoutAccountId"));
+  if (!payout.ok) throw new Error(payout.reason);
 
   // Verify the company against Companies House and use the official name, so a
   // borrower record can never disagree with the register. Enforcement is a
@@ -157,15 +141,7 @@ export async function createBorrowerAction(fd: FormData): Promise<void> {
     createdBy: user.id,
   });
 
-  let recipientId: string | null = null;
-  if (recipientName) {
-    const recipient = await upsertRecipient(db, borrower.id, {
-      name: recipientName,
-      accountNumber: await protectString(account?.replace(/\s/g, ""), env.APP_ENCRYPTION_KEY),
-      sortCode: await protectString(sort?.replace(/\D/g, ""), env.APP_ENCRYPTION_KEY),
-    });
-    recipientId = recipient.id;
-  }
+  const recipientId = (await upsertRecipient(db, borrower.id, recipientFieldsFrom(payout.account))).id;
 
   const amountMinor = money(fd, "amount");
   const frequency = str(fd, "frequency") as Frequency | null;

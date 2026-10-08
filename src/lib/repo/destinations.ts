@@ -170,6 +170,8 @@ export async function addRecipient(
     label?: string | null;
     accountNumber?: string | null;
     sortCode?: string | null;
+    /** The approved account these details were copied from. */
+    payoutAccountId?: string | null;
     makeDefault?: boolean;
   },
 ): Promise<Recipient> {
@@ -183,8 +185,9 @@ export async function addRecipient(
   const id = newId();
   const insert = db
     .prepare(
-      `INSERT INTO recipients (id, borrower_id, name, label, account_number, sort_code, is_default)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO recipients
+         (id, borrower_id, name, label, account_number, sort_code, payout_account_id, is_default)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -193,6 +196,7 @@ export async function addRecipient(
       data.label?.trim() || null,
       data.accountNumber ?? null,
       data.sortCode ?? null,
+      data.payoutAccountId ?? null,
       shouldDefault ? 1 : 0,
     );
 
@@ -237,6 +241,8 @@ export async function updateRecipient(
     label?: string | null;
     accountNumber?: string | null;
     sortCode?: string | null;
+    /** Set together with the details it supplied; left alone when omitted. */
+    payoutAccountId?: string | null;
   },
 ): Promise<{ detachedFromPlaid: boolean }> {
   const before = await getRecipientById(db, recipientId);
@@ -253,6 +259,7 @@ export async function updateRecipient(
       `UPDATE recipients SET name = ?, label = ?,
          account_number = COALESCE(?, account_number),
          sort_code = COALESCE(?, sort_code),
+         payout_account_id = COALESCE(?, payout_account_id),
          plaid_recipient_id = CASE WHEN ? THEN NULL ELSE plaid_recipient_id END
        WHERE id = ?`,
     )
@@ -261,6 +268,7 @@ export async function updateRecipient(
       data.label?.trim() || null,
       data.accountNumber ?? null,
       data.sortCode ?? null,
+      data.payoutAccountId ?? null,
       changed ? 1 : 0,
       recipientId,
     )
@@ -280,7 +288,10 @@ export async function updateRecipient(
       .run();
   }
 
-  return { detachedFromPlaid: changed };
+  // Only a real detachment if the bank had been told about the old details.
+  // Reporting one for an account never registered told staff to resend a link
+  // the borrower had never been sent.
+  return { detachedFromPlaid: changed && before?.plaid_recipient_id != null };
 }
 
 /**

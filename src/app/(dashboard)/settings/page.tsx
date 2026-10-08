@@ -7,6 +7,9 @@ import { isPlaidConfigured } from "@/lib/plaid";
 import { type MailerEnv } from "@/lib/mailer";
 import { emailReach } from "@/lib/mailer/reach";
 import { getEnv } from "@/lib/db";
+import { listAllPayoutAccounts, listUnlinkedRecipients } from "@/lib/repo/payout-accounts";
+import { describePayoutAccount, groupUnlinkedAccounts } from "@/lib/payout-accounts";
+import { PayoutAccountsPanel } from "@/components/payout-accounts-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +56,22 @@ export default async function SettingsPage() {
   // The fallback mailer silently swallows everything, so say so plainly here
   // rather than letting staff assume borrowers are being contacted.
   const reach = emailReach(env as MailerEnv);
+
+  // Decrypted and masked here, on the server, for admins only. The panel is a
+  // client component and must never receive a full account number.
+  const [payoutAccounts, unlinked] = isAdmin
+    ? await Promise.all([
+        listAllPayoutAccounts(db).then((all) =>
+          Promise.all(
+            all.map(async (a) => ({
+              ...(await describePayoutAccount(a, env.APP_ENCRYPTION_KEY)),
+              archived: a.archived_at != null,
+            })),
+          ),
+        ),
+        listUnlinkedRecipients(db).then((rows) => groupUnlinkedAccounts(rows, env.APP_ENCRYPTION_KEY)),
+      ])
+    : [[], []];
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -112,6 +131,21 @@ export default async function SettingsPage() {
           </div>
         </div>
       </div>
+
+      {isAdmin && (
+        <div className="mb-5 rounded-lg border border-slate-200 bg-white p-5">
+          <h2 className="text-sm font-semibold text-slate-900">Accounts repayments go to</h2>
+          <p className="mt-1 mb-3 text-xs text-slate-500">
+            The only accounts borrower repayments can be paid into. Staff choose from this list when
+            they onboard a borrower and can never type in an account number themselves. Only admins
+            can add to it.
+          </p>
+          <PayoutAccountsPanel
+            accounts={payoutAccounts}
+            unlinked={unlinked.map(({ key, name, masked, borrowers }) => ({ key, name, masked, borrowers }))}
+          />
+        </div>
+      )}
 
       {!isAdmin ? (
         <p className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">

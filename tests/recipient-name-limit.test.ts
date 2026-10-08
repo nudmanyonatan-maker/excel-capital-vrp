@@ -42,13 +42,15 @@ describe("payee name length", () => {
     expect(r.errors.join(" ")).not.toContain("18 characters");
   });
 
-  it("caps the borrower creation form too, not just the edit form", () => {
-    // Two separate entry points write a payee name; capping one leaves the
-    // other free to recreate the outage.
+  it("caps every place a payee name is entered", () => {
+    // Since the approved account list, the only place anyone types a payee name
+    // is an admin adding or adopting an account. Both paths must cap it, or one
+    // of them recreates the HSBC outage for every borrower using that account.
     const src = readFileSync(
-      path.join(__dirname, "..", "src/lib/actions/borrowers.ts"),
+      path.join(__dirname, "..", "src/lib/actions/payout-accounts.ts"),
       "utf8",
     );
+    expect(src).toContain("parseAccountDetails");
     expect(src).toContain("MAX_RECIPIENT_NAME");
   });
 });
