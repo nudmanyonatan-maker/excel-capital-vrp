@@ -73,7 +73,29 @@ export interface Recipient {
   is_default: number;
   /** Retired from the picker but kept readable, since payment history points here. */
   archived_at: string | null;
+  /**
+   * The approved account these details were copied from. Null only for rows
+   * created before the approved list existed (migration 0012).
+   */
+  payout_account_id: string | null;
   created_at: string;
+}
+
+/**
+ * An account the business has approved for repayments to be paid into. Only an
+ * admin adds these; everyone else can only choose one.
+ */
+export interface PayoutAccount {
+  id: string;
+  label: string;
+  name: string;
+  /** Encrypted at the app layer. */
+  account_number: string;
+  /** Encrypted at the app layer. */
+  sort_code: string;
+  archived_at: string | null;
+  created_at: string;
+  created_by: string | null;
 }
 
 export interface Consent {

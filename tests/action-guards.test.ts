@@ -70,8 +70,8 @@ describe("server action authorisation", () => {
     expect([...new Set(roles)]).toEqual(["operator"]);
   });
 
-  it("keeps staff and settings administration at admin", () => {
-    for (const file of ["staff.ts", "settings.ts"]) {
+  it("keeps staff, settings and the approved payout accounts at admin", () => {
+    for (const file of ["staff.ts", "settings.ts", "payout-accounts.ts"]) {
       const source = readFileSync(path.join(ACTIONS_DIR, file), "utf8");
       const roles = [...source.matchAll(/requireRole\("(\w+)"\)/g)].map((m) => m[1]);
       expect(roles.length).toBeGreaterThan(0);
@@ -171,5 +171,23 @@ describe("pages that decrypt bank details", () => {
     }
 
     expect(unguarded).toEqual([]);
+  });
+
+  it("lets only the admin payout-account actions turn typed digits into an account", () => {
+    // Where money goes is chosen from the approved list. If any other action
+    // encrypts an account number from a form, someone has reintroduced a way
+    // for whoever onboards a borrower to send its repayments to themselves.
+    const writers = actionFiles().filter((file) =>
+      /(?<!un)protectString\(/.test(readFileSync(path.join(ACTIONS_DIR, file), "utf8")),
+    );
+    expect(writers).toEqual(["payout-accounts.ts"]);
+  });
+
+  it("no borrower form reads a typed account number any more", () => {
+    for (const file of actionFiles()) {
+      if (file === "payout-accounts.ts") continue;
+      const source = readFileSync(path.join(ACTIONS_DIR, file), "utf8");
+      expect(source, file).not.toMatch(/"recipientAccount"|"recipientSort"|"accountNumber"|"sortCode"/);
+    }
   });
 });

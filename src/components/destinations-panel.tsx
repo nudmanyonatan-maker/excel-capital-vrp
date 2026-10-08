@@ -7,6 +7,8 @@ import {
   setDefaultDestinationAction,
   type DestinationState,
 } from "@/lib/actions/destinations";
+import type { PayoutChoice } from "@/lib/payout-accounts";
+import { PayoutAccountSelect } from "@/components/payout-account-select";
 
 /** One account as the panel needs it, already masked and decided server-side. */
 export interface DestinationRow {
@@ -110,7 +112,7 @@ function RowActions({ borrowerId, row }: { borrowerId: string; row: DestinationR
   );
 }
 
-function AddForm({ borrowerId }: { borrowerId: string }) {
+function AddForm({ borrowerId, choices }: { borrowerId: string; choices: PayoutChoice[] }) {
   const [state, formAction, pending] = useActionState<DestinationState, FormData>(
     addDestinationAction,
     null,
@@ -151,24 +153,18 @@ function AddForm({ borrowerId }: { borrowerId: string }) {
         bank login.
       </p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <PayoutAccountSelect
+          choices={choices}
+          className={field}
+          labelClassName={labelCls}
+          label="Account to pay into"
+        />
         <label className="block">
-          <span className={labelCls}>What to call it</span>
+          <span className={labelCls}>What to call it here (optional)</span>
           <input name="label" placeholder="Backup account" className={field} />
           <span className="mt-1 block text-xs text-slate-500">
-            Only you see this. It is how you will pick it when collecting.
+            Only staff see this. Leave it blank to use the account&apos;s own name.
           </span>
-        </label>
-        <label className="block">
-          <span className={labelCls}>Name on the account</span>
-          <input name="recipientName" required placeholder="Excel Capital Ltd" className={field} />
-        </label>
-        <label className="block">
-          <span className={labelCls}>Account number</span>
-          <input name="recipientAccount" required placeholder="12345678" className={field} />
-        </label>
-        <label className="block">
-          <span className={labelCls}>Sort code</span>
-          <input name="recipientSort" required placeholder="12-34-56" className={field} />
         </label>
         <label className="block">
           <span className={labelCls}>Most in one payment (£)</span>
@@ -220,10 +216,13 @@ function AddForm({ borrowerId }: { borrowerId: string }) {
 export function DestinationsPanel({
   borrowerId,
   rows,
+  choices,
   combined,
 }: {
   borrowerId: string;
   rows: DestinationRow[];
+  /** Approved accounts this person may add, already masked. */
+  choices: PayoutChoice[];
   /** Pre-formatted combined ceiling warning, or null when there is one mandate. */
   combined: string | null;
 }) {
@@ -274,7 +273,7 @@ export function DestinationsPanel({
       )}
 
       <div className="mt-4">
-        <AddForm borrowerId={borrowerId} />
+        <AddForm borrowerId={borrowerId} choices={choices} />
       </div>
     </div>
   );

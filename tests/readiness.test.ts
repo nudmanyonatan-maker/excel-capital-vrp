@@ -12,6 +12,7 @@ const recipient = (over: Partial<Recipient> = {}): Recipient => ({
   label: null,
   is_default: 1,
   archived_at: null,
+  payout_account_id: null,
   created_at: "",
   ...over,
 });

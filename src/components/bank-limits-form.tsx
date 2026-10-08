@@ -5,6 +5,8 @@ import {
   updateBankAndLimitsAction,
   type BankLimitsState,
 } from "@/lib/actions/bank-limits";
+import type { PayoutChoice } from "@/lib/payout-accounts";
+import { PayoutAccountSelect } from "@/components/payout-account-select";
 
 const input =
   "mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm";
@@ -17,14 +19,21 @@ const input =
 export function BankLimitsForm({
   borrowerId,
   locked,
+  choices,
+  current,
   defaults,
 }: {
   borrowerId: string;
   locked: boolean;
+  /** The approved accounts this person may choose, already masked. */
+  choices: PayoutChoice[];
+  /**
+   * The account the borrower is set up with now, when it was typed in before the
+   * approved list existed. Shown so nobody wonders where the old one went.
+   */
+  current: string | null;
   defaults: {
-    recipientName: string;
-    accountNumber: string;
-    sortCode: string;
+    payoutAccountId: string;
     maxPaymentAmount: string;
     periodicMaxAmount: string;
     consentPeriod: string;
@@ -65,35 +74,17 @@ export function BankLimitsForm({
           Where repayments are sent
         </h2>
         <p className="mt-0.5 text-xs text-slate-500">
-          Your own bank account. This is where the borrower&apos;s money lands.
+          Chosen from the accounts an admin has approved. This is where the borrower&apos;s money
+          lands.
         </p>
       </div>
-      <label className="block">
-        <span className="text-sm font-medium text-slate-700">Account name</span>
-        <input name="recipientName" defaultValue={shown.recipientName} className={input} />
-      </label>
-      <div className="grid grid-cols-2 gap-4">
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Account number</span>
-          <input
-            name="recipientAccount"
-            placeholder="12345678"
-            defaultValue={shown.accountNumber}
-            className={input}
-          />
-          <span className="mt-1 block text-xs text-slate-500">8 digits.</span>
-        </label>
-        <label className="block">
-          <span className="text-sm font-medium text-slate-700">Sort code</span>
-          <input
-            name="recipientSort"
-            placeholder="12-34-56"
-            defaultValue={shown.sortCode}
-            className={input}
-          />
-          <span className="mt-1 block text-xs text-slate-500">6 digits. Dashes are fine.</span>
-        </label>
-      </div>
+      {current && (
+        <p className="rounded-md bg-slate-50 p-2 text-xs text-slate-600">
+          Currently set up with {current}, which was typed in before the approved list existed.
+          Choosing an account below replaces it.
+        </p>
+      )}
+      <PayoutAccountSelect choices={choices} defaultValue={shown.payoutAccountId || undefined} />
 
       <div className="border-t border-slate-100 pt-4">
         <h2 className="text-sm font-semibold text-slate-900">Payment limits</h2>

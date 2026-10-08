@@ -55,7 +55,29 @@ function parseAmount(raw: string | undefined): number | null {
  */
 export const MAX_RECIPIENT_NAME = 18;
 
-export function parseBankAndLimits(raw: BankAndLimitsRaw): ParseResult {
+export interface AccountDetails {
+  recipientName: string;
+  accountNumber: string;
+  sortCode: string;
+}
+
+export interface Limits {
+  maxPaymentAmountMinor: number;
+  periodicMaxAmountMinor: number;
+  period: string;
+  validTo: string | null;
+}
+
+/**
+ * The name, account number and sort code of an account money is paid into.
+ *
+ * Only an admin types these now, when adding an approved payout account.
+ * Everyone else chooses from that list. The sort code comes back as six bare
+ * digits, since Plaid rejects the dashed form people naturally type.
+ */
+export function parseAccountDetails(
+  raw: Pick<BankAndLimitsRaw, "recipientName" | "accountNumber" | "sortCode">,
+): { errors: string[]; value?: AccountDetails } {
   const errors: string[] = [];
 
   const recipientName = (raw.recipientName ?? "").trim();
@@ -76,6 +98,16 @@ export function parseBankAndLimits(raw: BankAndLimitsRaw): ParseResult {
   if (!/^\d{6}$/.test(sortDigits)) {
     errors.push("The sort code must be 6 digits, for example 12-34-56.");
   }
+
+  if (errors.length > 0) return { errors };
+  return { errors: [], value: { recipientName, accountNumber: accountDigits, sortCode: sortDigits } };
+}
+
+/** The ceilings a borrower approves with their bank. Amounts come back in pence. */
+export function parseLimits(
+  raw: Pick<BankAndLimitsRaw, "maxPaymentAmount" | "periodicMaxAmount" | "consentPeriod" | "consentValidTo">,
+): { errors: string[]; value?: Limits } {
+  const errors: string[] = [];
 
   const maxPaymentAmountMinor = parseAmount(raw.maxPaymentAmount);
   if (maxPaymentAmountMinor === null) {
@@ -105,17 +137,22 @@ export function parseBankAndLimits(raw: BankAndLimitsRaw): ParseResult {
   }
 
   if (errors.length > 0) return { errors };
-
   return {
     errors: [],
     value: {
-      recipientName,
-      accountNumber: accountDigits,
-      sortCode: sortDigits,
       maxPaymentAmountMinor: maxPaymentAmountMinor!,
       periodicMaxAmountMinor: periodicMaxAmountMinor!,
       period,
       validTo: (raw.consentValidTo ?? "").trim() || null,
     },
   };
+}
+
+/** Both halves at once, reporting every problem rather than the first. */
+export function parseBankAndLimits(raw: BankAndLimitsRaw): ParseResult {
+  const account = parseAccountDetails(raw);
+  const limits = parseLimits(raw);
+  const errors = [...account.errors, ...limits.errors];
+  if (errors.length > 0) return { errors };
+  return { errors: [], value: { ...account.value!, ...limits.value! } };
 }

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getDb, getEnv } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/repo/audit";
-import { protectString, unprotectString } from "@/lib/crypto";
+import { unprotectString } from "@/lib/crypto";
 import {
   addRecipient,
   archiveRecipient,
@@ -13,13 +13,12 @@ import {
 } from "@/lib/repo/destinations";
 import { createPendingConsent } from "@/lib/repo/consents";
 import { getActiveSchedule } from "@/lib/repo/schedules";
-import { parseBankAndLimits } from "@/lib/borrower-setup-input";
+import { parseLimits } from "@/lib/borrower-setup-input";
+import { choosePayoutAccount, recipientFieldsFrom } from "@/lib/payout-accounts";
 
 export interface DestinationValues {
   label: string;
-  recipientName: string;
-  accountNumber: string;
-  sortCode: string;
+  payoutAccountId: string;
   maxPaymentAmount: string;
   periodicMaxAmount: string;
   consentPeriod: string;
@@ -50,19 +49,20 @@ export async function addDestinationAction(
 
   const values: DestinationValues = {
     label: String(fd.get("label") ?? ""),
-    recipientName: String(fd.get("recipientName") ?? ""),
-    accountNumber: String(fd.get("recipientAccount") ?? ""),
-    sortCode: String(fd.get("recipientSort") ?? ""),
+    payoutAccountId: String(fd.get("payoutAccountId") ?? ""),
     maxPaymentAmount: String(fd.get("maxPaymentAmount") ?? ""),
     periodicMaxAmount: String(fd.get("periodicMaxAmount") ?? ""),
     consentPeriod: String(fd.get("consentPeriod") ?? ""),
   };
 
-  const parsed = parseBankAndLimits({
+  const parsed = parseLimits({
     ...values,
     consentValidTo: String(fd.get("consentValidTo") ?? ""),
   });
-  if (parsed.errors.length > 0 || !parsed.value) return { errors: parsed.errors, values };
+  // Chosen from the approved list, never typed: see choosePayoutAccount.
+  const payout = await choosePayoutAccount(db, user, values.payoutAccountId);
+  const errors = [...(payout.ok ? [] : [payout.reason]), ...parsed.errors];
+  if (errors.length > 0 || !parsed.value || !payout.ok) return { errors, values };
   const v = parsed.value;
 
   // Refuse an exact duplicate account. Two mandates to the SAME account would
@@ -70,17 +70,22 @@ export async function addDestinationAction(
   // choice that changes nothing, which is the one shape of this feature that is
   // all risk and no benefit.
   const existing = await listDestinations(db, borrowerId);
-  const sortCodeCipher = await protectString(v.sortCode, env.APP_ENCRYPTION_KEY);
-  const accountCipher = await protectString(v.accountNumber, env.APP_ENCRYPTION_KEY);
-  // Compare on the plaintext we just parsed rather than on ciphertext: encryption
-  // is randomised, so equal accounts produce different ciphertext every time.
+  const [wantAccount, wantSort] = await Promise.all([
+    unprotectString(payout.account.account_number, env.APP_ENCRYPTION_KEY),
+    unprotectString(payout.account.sort_code, env.APP_ENCRYPTION_KEY),
+  ]);
+  // Compare plaintext rather than ciphertext: rows typed in before the approved
+  // list existed hold their own encryption of the same digits.
   for (const d of existing) {
     if (!d.recipient || d.recipient.archived_at) continue;
     const [acct, sort] = await Promise.all([
       unprotectString(d.recipient.account_number, env.APP_ENCRYPTION_KEY),
       unprotectString(d.recipient.sort_code, env.APP_ENCRYPTION_KEY),
     ]);
-    if (acct?.replace(/\D/g, "") === v.accountNumber && sort?.replace(/\D/g, "") === v.sortCode) {
+    if (
+      acct?.replace(/\D/g, "") === wantAccount?.replace(/\D/g, "") &&
+      sort?.replace(/\D/g, "") === wantSort?.replace(/\D/g, "")
+    ) {
       return {
         errors: [
           "That account is already set up for this borrower. Adding it twice would double how much can be taken, without changing where the money goes.",
@@ -91,10 +96,8 @@ export async function addDestinationAction(
   }
 
   const recipient = await addRecipient(db, borrowerId, {
-    name: v.recipientName,
-    label: values.label,
-    accountNumber: accountCipher,
-    sortCode: sortCodeCipher,
+    ...recipientFieldsFrom(payout.account),
+    label: values.label.trim() || payout.account.label,
     // Never silently steal the default: scheduled collections follow it, and a
     // new unapproved account cannot receive anything yet.
     makeDefault: false,

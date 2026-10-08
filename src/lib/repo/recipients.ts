@@ -27,13 +27,26 @@ export async function getRecipient(
 export async function upsertRecipient(
   db: D1Database,
   borrowerId: string,
-  data: { name: string; accountNumber?: string | null; sortCode?: string | null },
+  data: {
+    name: string;
+    accountNumber?: string | null;
+    sortCode?: string | null;
+    payoutAccountId?: string | null;
+  },
 ): Promise<Recipient> {
   const existing = await getRecipient(db, borrowerId);
   if (existing) {
     await db
-      .prepare("UPDATE recipients SET name = ?, account_number = ?, sort_code = ? WHERE id = ?")
-      .bind(data.name, data.accountNumber ?? null, data.sortCode ?? null, existing.id)
+      .prepare(
+        "UPDATE recipients SET name = ?, account_number = ?, sort_code = ?, payout_account_id = ? WHERE id = ?",
+      )
+      .bind(
+        data.name,
+        data.accountNumber ?? null,
+        data.sortCode ?? null,
+        data.payoutAccountId ?? null,
+        existing.id,
+      )
       .run();
     return (await getRecipient(db, borrowerId))!;
   }
@@ -46,10 +59,18 @@ export async function upsertRecipient(
   // addRecipient already does this for accounts added later.
   await db
     .prepare(
-      `INSERT INTO recipients (id, borrower_id, name, account_number, sort_code, is_default)
-       VALUES (?, ?, ?, ?, ?, 1)`,
+      `INSERT INTO recipients
+         (id, borrower_id, name, account_number, sort_code, payout_account_id, is_default)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
     )
-    .bind(id, borrowerId, data.name, data.accountNumber ?? null, data.sortCode ?? null)
+    .bind(
+      id,
+      borrowerId,
+      data.name,
+      data.accountNumber ?? null,
+      data.sortCode ?? null,
+      data.payoutAccountId ?? null,
+    )
     .run();
   return (await getRecipient(db, borrowerId))!;
 }

@@ -1,26 +1,24 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDb, getEnv } from "@/lib/db";
+import { getDb } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/repo/audit";
-import { protectString } from "@/lib/crypto";
 import { addRecipient, listDestinations, updateRecipient } from "@/lib/repo/destinations";
 import {
   createPendingConsent,
   updateUnauthorisedConsentLimits,
   setConsentRecipient,
 } from "@/lib/repo/consents";
-import { parseBankAndLimits } from "@/lib/borrower-setup-input";
+import { parseLimits } from "@/lib/borrower-setup-input";
+import { choosePayoutAccount, recipientFieldsFrom } from "@/lib/payout-accounts";
 
 /**
  * `values` echoes back what was submitted so a validation error does not wipe
  * the operator's typing. Without it, fixing one field silently clears the rest.
  */
 export interface BankLimitsValues {
-  recipientName: string;
-  accountNumber: string;
-  sortCode: string;
+  payoutAccountId: string;
   maxPaymentAmount: string;
   periodicMaxAmount: string;
   consentPeriod: string;
@@ -49,26 +47,27 @@ export async function updateBankAndLimitsAction(
 ): Promise<BankLimitsState> {
   const user = await requireRole("operator");
   const db = getDb();
-  const env = getEnv();
 
   const borrowerId = String(fd.get("borrowerId") ?? "");
   if (!borrowerId) return { errors: ["Something went wrong: no borrower was selected."] };
 
   const values: BankLimitsValues = {
-    recipientName: String(fd.get("recipientName") ?? ""),
-    accountNumber: String(fd.get("recipientAccount") ?? ""),
-    sortCode: String(fd.get("recipientSort") ?? ""),
+    payoutAccountId: String(fd.get("payoutAccountId") ?? ""),
     maxPaymentAmount: String(fd.get("maxPaymentAmount") ?? ""),
     periodicMaxAmount: String(fd.get("periodicMaxAmount") ?? ""),
     consentPeriod: String(fd.get("consentPeriod") ?? ""),
   };
 
-  const parsed = parseBankAndLimits({
+  const parsed = parseLimits({
     ...values,
     consentValidTo: String(fd.get("consentValidTo") ?? ""),
   });
-  if (parsed.errors.length > 0 || !parsed.value) return { errors: parsed.errors, values };
+  // Chosen from the approved list, never typed: see choosePayoutAccount.
+  const payout = await choosePayoutAccount(db, user, values.payoutAccountId);
+  const errors = [...(payout.ok ? [] : [payout.reason]), ...parsed.errors];
+  if (errors.length > 0 || !parsed.value || !payout.ok) return { errors, values };
   const v = parsed.value;
+  const fields = recipientFieldsFrom(payout.account);
 
   // Both halves of this form must describe the SAME account.
   //
@@ -93,27 +92,21 @@ export async function updateBankAndLimitsAction(
     };
   }
 
-  const accountNumber = await protectString(v.accountNumber, env.APP_ENCRYPTION_KEY);
-  const sortCode = await protectString(v.sortCode, env.APP_ENCRYPTION_KEY);
-
   // Update the account this form is actually about, by id, rather than whichever
-  // row happens to be newest.
+  // row happens to be newest. Re-saving the account it already uses changes
+  // nothing, so the borrower is not asked to approve again for no reason.
   let recipient = target?.recipient ?? null;
   let needsNewLink = false;
   if (recipient) {
-    const { detachedFromPlaid } = await updateRecipient(db, recipient.id, {
-      name: v.recipientName,
-      label: recipient.label,
-      accountNumber,
-      sortCode,
-    });
-    needsNewLink ||= detachedFromPlaid;
+    if (recipient.payout_account_id !== payout.account.id) {
+      const { detachedFromPlaid } = await updateRecipient(db, recipient.id, {
+        ...fields,
+        label: recipient.label,
+      });
+      needsNewLink ||= detachedFromPlaid;
+    }
   } else {
-    recipient = await addRecipient(db, borrowerId, {
-      name: v.recipientName,
-      accountNumber,
-      sortCode,
-    });
+    recipient = await addRecipient(db, borrowerId, fields);
   }
 
   if (consent) {

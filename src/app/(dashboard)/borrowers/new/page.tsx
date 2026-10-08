@@ -7,7 +7,9 @@ import { WeekdayPicker } from "@/components/weekday-picker";
 import { CompanyLookup } from "@/components/company-lookup";
 import { CeilingSuggester } from "@/components/ceiling-suggester";
 import { isCompaniesHouseConfigured } from "@/lib/companies-house";
-import { getEnv } from "@/lib/db";
+import { getDb, getEnv } from "@/lib/db";
+import { payoutChoicesFor } from "@/lib/payout-accounts";
+import { PayoutAccountSelect } from "@/components/payout-account-select";
 
 export const dynamic = "force-dynamic";
 
@@ -78,7 +80,9 @@ export default async function NewBorrowerPage() {
 
   // Only offer the register lookup when an API key is configured; otherwise the
   // form is plain manual entry.
-  const companiesHouseReady = isCompaniesHouseConfigured(getEnv());
+  const env = getEnv();
+  const companiesHouseReady = isCompaniesHouseConfigured(env);
+  const payoutChoices = await payoutChoicesFor(getDb(), user, env.APP_ENCRYPTION_KEY);
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-6">
@@ -102,10 +106,8 @@ export default async function NewBorrowerPage() {
           <Field label="Contact phone" name="contactPhone" />
         </Section>
 
-        <Section title="Recipient">
-          <Field label="Account name" name="recipientName" required placeholder="Excel Capital Group Ltd" />
-          <Field label="Account number" name="recipientAccount" required placeholder="12345678" />
-          <Field label="Sort code" name="recipientSort" required placeholder="12-34-56" />
+        <Section title="Where repayments go">
+          <PayoutAccountSelect choices={payoutChoices} />
         </Section>
 
         <Section title="Repayment schedule">
