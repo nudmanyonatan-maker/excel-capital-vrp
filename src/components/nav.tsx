@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/audit", label: "Audit" },
   { href: "/staff", label: "Staff", adminOnly: true },
   { href: "/settings", label: "Settings", adminOnly: true },
+  { href: "/help", label: "Help" },
 ];
 
 export function Nav({

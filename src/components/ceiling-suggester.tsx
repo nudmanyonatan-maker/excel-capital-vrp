@@ -13,8 +13,19 @@ import { useState } from "react";
  * Reads and writes the sibling inputs rather than owning them, so the
  * surrounding form stays a plain server-action form.
  */
-export function CeilingSuggester() {
+export function CeilingSuggester({
+  ownAmount = false,
+}: {
+  /**
+   * Ask for the repayment here instead of reading the schedule above. A sales
+   * rep has no schedule section, so without this the button could only ever
+   * tell them to fill in a field they cannot see.
+   */
+  ownAmount?: boolean;
+}) {
   const [message, setMessage] = useState<string | null>(null);
+  const [localAmount, setLocalAmount] = useState("");
+  const [localFrequency, setLocalFrequency] = useState("weekly");
 
   const input = (name: string) =>
     document.querySelector(`[name="${name}"]`) as HTMLInputElement | null;
@@ -22,10 +33,14 @@ export function CeilingSuggester() {
     document.querySelector(`[name="${name}"]`) as HTMLSelectElement | null;
 
   function suggest() {
-    const amount = Number(input("amount")?.value ?? "");
-    const frequency = select("frequency")?.value ?? "weekly";
+    const amount = Number(ownAmount ? localAmount : (input("amount")?.value ?? ""));
+    const frequency = ownAmount ? localFrequency : (select("frequency")?.value ?? "weekly");
     if (!Number.isFinite(amount) || amount <= 0) {
-      setMessage("Enter the repayment amount above first, then press this again.");
+      setMessage(
+        ownAmount
+          ? "Enter the expected repayment first, then press this again."
+          : "Enter the repayment amount above first, then press this again.",
+      );
       return;
     }
 
@@ -56,12 +71,42 @@ export function CeilingSuggester() {
 
   return (
     <div className="col-span-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+      {ownAmount && (
+        // Deliberately unnamed: these only feed the suggestion and are never
+        // submitted, so nothing here can set a schedule.
+        <div className="mb-2 flex flex-wrap items-end gap-3">
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700">Expected repayment (£)</span>
+            <input
+              type="number"
+              step="0.01"
+              value={localAmount}
+              onChange={(e) => setLocalAmount(e.target.value)}
+              placeholder="500.00"
+              className="mt-1 block w-36 rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium text-slate-700">How often</span>
+            <select
+              value={localFrequency}
+              onChange={(e) => setLocalFrequency(e.target.value)}
+              className="mt-1 block rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
+            >
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="fortnightly">Fortnightly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </label>
+        </div>
+      )}
       <button
         type="button"
         onClick={suggest}
         className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-slate-100"
       >
-        Suggest ceilings from the repayment amount
+        {ownAmount ? "Suggest ceilings" : "Suggest ceilings from the repayment amount"}
       </button>
       <p className="mt-1 text-xs text-slate-500">
         Not sure what to put? This fills both ceilings with sensible values that

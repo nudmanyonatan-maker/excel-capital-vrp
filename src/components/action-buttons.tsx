@@ -1,5 +1,7 @@
 "use client";
 
+import { InfoTip } from "@/components/info-tip";
+import { TIPS } from "@/lib/help-text";
 import { useActionState, useState } from "react";
 import {
   sendSetupLinkAction,
@@ -368,7 +370,10 @@ export function OneOffPaymentButton({
         <input type="hidden" name="borrowerId" value={borrowerId} />
         <input type="hidden" name="nonce" value={nonce} />
         <label className="block">
-          <span className="text-xs font-medium text-slate-700">Amount (£)</span>
+          <span className="text-xs font-medium text-slate-700">
+            Amount (£)
+            <InfoTip text={TIPS.oneOffAmount} />
+          </span>
           <input
             name="amount"
             type="number"
@@ -384,6 +389,7 @@ export function OneOffPaymentButton({
         <label className="block">
           <span className="text-xs font-medium text-slate-700">
             What is it for?
+            <InfoTip text={TIPS.oneOffReason} />
           </span>
           <input
             name="reason"

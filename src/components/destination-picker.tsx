@@ -1,5 +1,7 @@
 "use client";
 
+import { InfoTip } from "@/components/info-tip";
+import { TIPS } from "@/lib/help-text";
 /** One collectable account, flattened for the client. */
 export interface DestinationChoice {
   consentId: string;
@@ -33,7 +35,10 @@ export function DestinationPicker({
 
   return (
     <label className="block">
-      <span className="text-xs font-medium text-slate-700">Pay into</span>
+      <span className="text-xs font-medium text-slate-700">
+        Pay into
+        <InfoTip text={TIPS.scheduleDestination} />
+      </span>
       <select
         name={name}
         defaultValue={preselected.consentId}
