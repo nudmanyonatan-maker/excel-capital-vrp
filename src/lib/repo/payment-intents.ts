@@ -82,3 +82,22 @@ export async function completePaymentIntent(
     .run();
 }
 
+/**
+ * Pence this person has started collecting since a moment, across every
+ * borrower. For a sales rep that is their £1 tests, which is all they can send.
+ * Cancelled intents never reached the bank, so they do not count.
+ */
+export async function amountStartedBySince(
+  db: D1Database,
+  staffId: string,
+  sinceIso: string,
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(amount_minor), 0) AS total FROM payment_intents
+        WHERE created_by = ? AND created_at >= ? AND status <> 'cancelled'`,
+    )
+    .bind(staffId, sinceIso)
+    .first<{ total: number }>();
+  return row?.total ?? 0;
+}

@@ -2,6 +2,15 @@ import type { Consent } from "@/lib/types";
 import { formatMinor } from "@/lib/money";
 
 /**
+ * The only amount a test payment can be. Plaid's minimum is £1.00, so it is
+ * also the smallest payment that proves a mandate works end to end.
+ */
+export const TEST_AMOUNT_MINOR = 100;
+
+/** How much a sales rep may send in tests in any 24 hours, across all borrowers. */
+export const SALES_DAILY_TEST_LIMIT_MINOR = 500;
+
+/**
  * Check a one-off amount against what the borrower actually authorised.
  *
  * The bank enforces the same caps, so this is not the security boundary. It

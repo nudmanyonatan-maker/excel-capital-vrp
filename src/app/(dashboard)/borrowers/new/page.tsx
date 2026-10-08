@@ -62,10 +62,10 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default async function NewBorrowerPage() {
-  // Operators only, matching createBorrowerAction. A viewer could otherwise fill
-  // in a borrower's bank details and limits and lose the lot on submit.
+  // Sales reps and up, matching createBorrowerAction. A viewer could otherwise
+  // fill the whole form in and lose it on submit.
   const user = await getCurrentUser();
-  if (!user || !hasRole(user, "operator")) {
+  if (!user || !hasRole(user, "sales")) {
     return (
       <div className="mx-auto max-w-3xl">
         <Link href="/borrowers" className="text-sm text-slate-500 hover:underline">
@@ -80,6 +80,7 @@ export default async function NewBorrowerPage() {
 
   // Only offer the register lookup when an API key is configured; otherwise the
   // form is plain manual entry.
+  const canSchedule = hasRole(user, "operator");
   const env = getEnv();
   const companiesHouseReady = isCompaniesHouseConfigured(env);
   const payoutChoices = await payoutChoicesFor(getDb(), user, env.APP_ENCRYPTION_KEY);
@@ -110,6 +111,9 @@ export default async function NewBorrowerPage() {
           <PayoutAccountSelect choices={payoutChoices} />
         </Section>
 
+        {/* Schedules are for the accounts team. A sales rep sets the borrower up;
+            the action ignores schedule fields from them anyway. */}
+        {canSchedule && (
         <Section title="Repayment schedule">
           <Field label="Amount (£)" name="amount" type="number" required placeholder="500.00" />
           <label className="block">
@@ -145,6 +149,7 @@ export default async function NewBorrowerPage() {
           <Field label="End: date" name="endDate" type="date" help="For 'On a fixed date'" />
           <Field label="End: total (£)" name="endTotal" type="number" help="For 'When a total is collected'" />
         </Section>
+        )}
 
         <Section title="VRP consent limits">
           <CeilingSuggester />

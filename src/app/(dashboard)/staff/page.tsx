@@ -4,6 +4,7 @@ import { listPendingRequests } from "@/lib/repo/access-requests";
 import { AccessRequestQueue } from "@/components/access-request-queue";
 import { getCurrentUser, hasRole } from "@/lib/auth";
 import { StatusBadge } from "@/components/status-badge";
+import { RoleGuide } from "@/components/role-guide";
 import {
   AddStaffForm,
   StaffDisableForm,
@@ -40,6 +41,13 @@ export default async function StaffPage() {
         <p className="mt-1 text-sm text-slate-500">
           Manage who can access the platform and what they can do.
         </p>
+      </div>
+
+      <div className="mb-6 rounded-lg border border-slate-200 bg-white p-5">
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          What each role can do
+        </h2>
+        <RoleGuide />
       </div>
 
       <div className="mb-6 rounded-lg border border-slate-200 bg-white p-5">

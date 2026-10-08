@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { ROLE_INFO } from "@/lib/roles";
 import { getCurrentUser } from "@/lib/auth";
 import { getAuthenticatedEmail } from "@/lib/access";
 import { getDb, getEnv } from "@/lib/db";
@@ -54,7 +55,7 @@ export default async function DashboardLayout({
           </div>
           <div className="text-right text-xs text-slate-500">
             <div className="font-medium text-slate-700">{user.email}</div>
-            <div className="capitalize">{user.role}</div>
+            <div>{ROLE_INFO[user.role].name}</div>
           </div>
         </div>
       </header>

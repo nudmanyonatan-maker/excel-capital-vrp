@@ -12,6 +12,7 @@ import {
   linkRecipientsToPayoutAccount,
   listActivePayoutAccounts,
   listUnlinkedRecipients,
+  setSalesCanUse,
 } from "@/lib/repo/payout-accounts";
 import { groupUnlinkedAccounts } from "@/lib/payout-accounts";
 import type { PayoutAccount } from "@/lib/types";
@@ -175,5 +176,33 @@ export async function adoptExistingAccountAction(
   revalidatePath("/settings");
   return {
     saved: `${account.label} is on the list, and ${linked} existing borrower account${linked === 1 ? " is" : "s are"} linked to it.`,
+  };
+}
+
+/** Let sales reps choose this account, or stop them. Admins only. */
+export async function setSalesCanUseAction(
+  _prev: PayoutAccountState,
+  fd: FormData,
+): Promise<PayoutAccountState> {
+  const user = await requireRole("admin");
+  const db = getDb();
+  const id = String(fd.get("payoutAccountId") ?? "");
+  const allowed = String(fd.get("allowed") ?? "") === "true";
+  if (!id) return { error: "Something went wrong: no account was selected." };
+
+  if (!(await setSalesCanUse(db, id, allowed))) {
+    return { error: "That account is no longer on the list. Refresh the page." };
+  }
+  await writeAudit(db, {
+    actorStaffId: user.id,
+    action: allowed ? "payout_account.sales_on" : "payout_account.sales_off",
+    entityType: "payout_account",
+    entityId: id,
+  });
+  revalidatePath("/settings");
+  return {
+    saved: allowed
+      ? "Sales reps can now choose this account."
+      : "Sales reps can no longer choose this account. Borrowers already using it are not affected.",
   };
 }

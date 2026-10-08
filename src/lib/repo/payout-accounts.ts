@@ -105,3 +105,12 @@ export async function linkRecipientsToPayoutAccount(
     .run();
   return result.meta.changes ?? 0;
 }
+
+/** Open or close an approved account to sales reps. */
+export async function setSalesCanUse(db: D1Database, id: string, allowed: boolean): Promise<boolean> {
+  const result = await db
+    .prepare("UPDATE payout_accounts SET sales_can_use = ? WHERE id = ? AND archived_at IS NULL")
+    .bind(allowed ? 1 : 0, id)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}

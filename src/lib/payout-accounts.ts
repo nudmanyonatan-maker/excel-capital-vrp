@@ -46,11 +46,20 @@ export async function describePayoutAccount(
  */
 export async function payoutChoicesFor(
   db: D1Database,
-  _user: StaffUser,
+  user: StaffUser,
   encryptionKey: string,
 ): Promise<PayoutChoice[]> {
-  const accounts = await listActivePayoutAccounts(db);
+  const accounts = (await listActivePayoutAccounts(db)).filter((a) => mayUse(user, a));
   return Promise.all(accounts.map((a) => describePayoutAccount(a, encryptionKey)));
+}
+
+/**
+ * Admins and operators may choose any approved account. A sales rep only the
+ * ones an admin has opened to sales, so a rep onboarding a borrower for Excel
+ * Capital cannot pick, say, an investor's account.
+ */
+function mayUse(user: StaffUser, account: PayoutAccount): boolean {
+  return user.role !== "sales" || account.sales_can_use === 1;
 }
 
 /**
@@ -60,7 +69,7 @@ export async function payoutChoicesFor(
  */
 export async function choosePayoutAccount(
   db: D1Database,
-  _user: StaffUser,
+  user: StaffUser,
   payoutAccountId: string | null | undefined,
 ): Promise<{ ok: true; account: PayoutAccount } | { ok: false; reason: string }> {
   const id = (payoutAccountId ?? "").trim();
@@ -74,7 +83,26 @@ export async function choosePayoutAccount(
       reason: "That account is not on the approved list any more. Choose another one.",
     };
   }
+  if (!mayUse(user, account)) {
+    return {
+      ok: false,
+      reason: "Sales reps cannot use that account. Choose one from the list, or ask an admin.",
+    };
+  }
   return { ok: true, account };
+}
+
+/** "Name (••••4321 / ••-••-56)" for an account row, never the full number. */
+export async function describeStoredAccount(
+  account: { name: string; account_number: string | null; sort_code: string | null },
+  encryptionKey: string,
+): Promise<string> {
+  const [acct, sort] = await Promise.all([
+    unprotectString(account.account_number, encryptionKey),
+    unprotectString(account.sort_code, encryptionKey),
+  ]);
+  const masked = [maskAccount(acct), maskSortCode(sort)].filter(Boolean).join(" / ");
+  return masked ? `${account.name} (${masked})` : account.name;
 }
 
 /** The fields a borrower's own account row copies from an approved account. */

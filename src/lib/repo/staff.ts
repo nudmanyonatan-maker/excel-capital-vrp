@@ -1,29 +1,43 @@
 import type { Role, StaffUser } from "@/lib/types";
 import { newId } from "@/lib/ids";
+import { roleFromStored, storedRole } from "@/lib/roles";
 
 // The staff_users row after migration 0002 carries a soft-disable flag. The
 // shared StaffUser type does not model it, so repo reads use this widened row
 // (assignable anywhere StaffUser is expected) to expose disabled_at.
 export type StaffRow = StaffUser & { disabled_at: string | null };
 
+/**
+ * Every staff read goes through this, because the stored role is not the real
+ * one for a sales rep (see migration 0013 and lib/roles).
+ */
+function toStaff(row: (Omit<StaffRow, "role"> & { role: string; is_sales?: number }) | null): StaffRow | null {
+  if (!row) return null;
+  const { is_sales, ...rest } = row;
+  return { ...rest, role: roleFromStored(row.role, is_sales) };
+}
+
+type StoredStaffRow = Omit<StaffRow, "role"> & { role: string; is_sales: number };
+
 export async function getStaffByEmail(
   db: D1Database,
   email: string,
 ): Promise<StaffRow | null> {
-  return db
-    .prepare("SELECT * FROM staff_users WHERE email = ?")
-    .bind(email.toLowerCase())
-    .first<StaffRow>();
+  return toStaff(
+    await db
+      .prepare("SELECT * FROM staff_users WHERE email = ?")
+      .bind(email.toLowerCase())
+      .first<StoredStaffRow>(),
+  );
 }
 
 export async function getStaffById(
   db: D1Database,
   id: string,
 ): Promise<StaffRow | null> {
-  return db
-    .prepare("SELECT * FROM staff_users WHERE id = ?")
-    .bind(id)
-    .first<StaffRow>();
+  return toStaff(
+    await db.prepare("SELECT * FROM staff_users WHERE id = ?").bind(id).first<StoredStaffRow>(),
+  );
 }
 
 export async function countStaff(db: D1Database): Promise<number> {
@@ -39,9 +53,10 @@ export async function createStaff(
   role: Role,
 ): Promise<StaffRow> {
   const id = newId();
+  const stored = storedRole(role);
   await db
-    .prepare("INSERT INTO staff_users (id, email, role) VALUES (?, ?, ?)")
-    .bind(id, email.toLowerCase(), role)
+    .prepare("INSERT INTO staff_users (id, email, role, is_sales) VALUES (?, ?, ?, ?)")
+    .bind(id, email.toLowerCase(), stored.role, stored.isSales)
     .run();
   const created = await getStaffByEmail(db, email);
   if (!created) throw new Error("failed to create staff user");
@@ -58,8 +73,8 @@ export async function touchLastLogin(db: D1Database, id: string): Promise<void> 
 export async function listStaff(db: D1Database): Promise<StaffRow[]> {
   const { results } = await db
     .prepare("SELECT * FROM staff_users ORDER BY created_at")
-    .all<StaffRow>();
-  return results ?? [];
+    .all<StoredStaffRow>();
+  return (results ?? []).map((r) => toStaff(r)!);
 }
 
 export async function setStaffRole(
@@ -67,9 +82,10 @@ export async function setStaffRole(
   id: string,
   role: Role,
 ): Promise<void> {
+  const stored = storedRole(role);
   await db
-    .prepare("UPDATE staff_users SET role = ? WHERE id = ?")
-    .bind(role, id)
+    .prepare("UPDATE staff_users SET role = ?, is_sales = ? WHERE id = ?")
+    .bind(stored.role, stored.isSales, id)
     .run();
 }
 

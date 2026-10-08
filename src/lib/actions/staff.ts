@@ -12,14 +12,13 @@ import {
   staffChangeGuard,
 } from "@/lib/repo/staff";
 import type { Role } from "@/lib/types";
+import { isRole, ROLE_INFO } from "@/lib/roles";
 
 export type StaffActionState = { message: string } | null;
 
-const ROLES: Role[] = ["admin", "operator", "viewer"];
-
 function readRole(fd: FormData): Role | null {
   const v = String(fd.get("role") ?? "");
-  return ROLES.includes(v as Role) ? (v as Role) : null;
+  return isRole(v) ? v : null;
 }
 
 /** Add a new staff member (admin only). */
@@ -51,7 +50,7 @@ export async function addStaffAction(
     metadata: { email, role },
   });
   revalidatePath("/staff");
-  return { message: `Added ${email} as ${role}.` };
+  return { message: `Added ${email} as ${ROLE_INFO[role].name}.` };
 }
 
 /** Change a staff member's role (admin only), guarded against lockout. */
@@ -78,7 +77,7 @@ export async function setStaffRoleAction(
     metadata: { role },
   });
   revalidatePath("/staff");
-  return { message: `Role updated to ${role}.` };
+  return { message: `Role updated to ${ROLE_INFO[role].name}.` };
 }
 
 /** Disable or enable a staff member (admin only), guarded against lockout. */

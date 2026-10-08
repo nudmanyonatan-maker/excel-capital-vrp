@@ -1,5 +1,6 @@
 "use client";
 
+import { ROLES, ROLE_INFO } from "@/lib/roles";
 import { useActionState } from "react";
 import {
   decideRequestAction,
@@ -68,9 +69,11 @@ export function AccessRequestQueue({ requests }: { requests: AccessRequest[] }) 
                   aria-label={`Role for ${r.email}`}
                   className="rounded-md border border-slate-300 px-2 py-1 text-sm"
                 >
-                  <option value="viewer">Can look only</option>
-                  <option value="operator">Can take payments</option>
-                  <option value="admin">Full admin</option>
+                  {ROLES.map((role) => (
+                    <option key={role} value={role}>
+                      {ROLE_INFO[role].name}: {ROLE_INFO[role].summary}
+                    </option>
+                  ))}
                 </select>
                 <button
                   type="submit"
