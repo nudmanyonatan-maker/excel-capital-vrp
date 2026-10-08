@@ -588,6 +588,22 @@ the bank, and the Plaid session id. Quote the session id to Plaid support.
   2026-10-05 the page a bank returns the borrower to (`/setup/complete`, used by
   Lloyds, HSBC and most large banks) did not record failures. It does now.
 
+## Roles, approved accounts and help (2026-10-08)
+
+- **Approved accounts (migration 0012).** Borrower repayments can only go to an
+  account on Settings > "Accounts repayments go to". Only admins add to it; every
+  borrower form is a picker, and `choosePayoutAccount` re-checks the id on the
+  server. `tests/action-guards.test.ts` fails if any other action encrypts an
+  account number. After deploying, an admin adds the real accounts (or adopts
+  the ones borrowers already use) before anyone can onboard.
+- **Sales role (migration 0013).** Stored as `role = 'viewer', is_sales = 1`
+  because the role CHECK cannot be widened on D1. Reps onboard, choose a
+  sales-open account, send setup links and £1 tests (max £5 per 24h). They
+  cannot schedule, collect, pause or archive. `tests/role-matrix.test.ts` pins
+  the role every action needs.
+- **Help.** `/help` for every staff member; screenshots in `public/help/`.
+  Field tooltips read from `src/lib/help-text.ts`, so change wording there.
+
 ## Going live, in order
 
 Run `./scripts/prod-preflight.sh` at any point. It reports what production is

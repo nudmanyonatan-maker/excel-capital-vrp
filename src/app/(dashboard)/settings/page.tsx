@@ -1,3 +1,4 @@
+import { InfoTip } from "@/components/info-tip";
 import { getDb } from "@/lib/db";
 import { getSettings } from "@/lib/repo/settings";
 import { getCurrentUser, hasRole } from "@/lib/auth";
@@ -33,7 +34,10 @@ function Field({
 }) {
   return (
     <label className={`block ${wide ? "col-span-2" : ""}`}>
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <span className="text-sm font-medium text-slate-700">
+        {label}
+        <InfoTip text={help} />
+      </span>
       <input
         name={name}
         type={type}

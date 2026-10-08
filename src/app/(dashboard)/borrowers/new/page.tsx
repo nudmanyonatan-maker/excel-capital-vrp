@@ -10,6 +10,8 @@ import { isCompaniesHouseConfigured } from "@/lib/companies-house";
 import { getDb, getEnv } from "@/lib/db";
 import { payoutChoicesFor } from "@/lib/payout-accounts";
 import { PayoutAccountSelect } from "@/components/payout-account-select";
+import { InfoTip } from "@/components/info-tip";
+import { TIPS } from "@/lib/help-text";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,7 @@ function Field({
   help,
   required,
   defaultValue,
+  tip,
 }: {
   label: string;
   name: string;
@@ -29,12 +32,14 @@ function Field({
   help?: string;
   required?: boolean;
   defaultValue?: string;
+  tip?: string;
 }) {
   return (
     <label className="block">
       <span className="text-sm font-medium text-slate-700">
         {label}
         {required && <span className="text-red-500"> *</span>}
+        {tip && <InfoTip text={tip} />}
       </span>
       <input
         name={name}
@@ -101,23 +106,26 @@ export default async function NewBorrowerPage() {
       <BorrowerCreateForm className="space-y-5">
         <Section title="Business">
           {companiesHouseReady && <CompanyLookup />}
-          <Field label="Legal name" name="legalName" required placeholder="Acme Trading Ltd" />
-          <Field label="Company number" name="companyNumber" placeholder="12345678" />
-          <Field label="Contact email" name="contactEmail" type="email" />
-          <Field label="Contact phone" name="contactPhone" />
+          <Field label="Legal name" name="legalName" required placeholder="Acme Trading Ltd" tip={TIPS.legalName} />
+          <Field label="Company number" name="companyNumber" placeholder="12345678" tip={TIPS.companyNumber} />
+          <Field label="Contact email" name="contactEmail" type="email" tip={TIPS.contactEmail} />
+          <Field label="Contact phone" name="contactPhone" tip={TIPS.contactPhone} />
         </Section>
 
         <Section title="Where repayments go">
-          <PayoutAccountSelect choices={payoutChoices} />
+          <PayoutAccountSelect choices={payoutChoices} tip={TIPS.payoutAccount} />
         </Section>
 
         {/* Schedules are for the accounts team. A sales rep sets the borrower up;
             the action ignores schedule fields from them anyway. */}
         {canSchedule && (
         <Section title="Repayment schedule">
-          <Field label="Amount (£)" name="amount" type="number" required placeholder="500.00" />
+          <Field label="Amount (£)" name="amount" type="number" required placeholder="500.00" tip={TIPS.amount} />
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Frequency</span>
+            <span className="text-sm font-medium text-slate-700">
+              Frequency
+              <InfoTip text={TIPS.frequency} />
+            </span>
             <select
               name="frequency"
               className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
@@ -132,10 +140,13 @@ export default async function NewBorrowerPage() {
           <div className="col-span-2">
             <WeekdayPicker selected={null} />
           </div>
-          <Field label="Interval days (custom only)" name="intervalDays" type="number" />
-          <Field label="Start date" name="startDate" type="date" required />
+          <Field label="Interval days (custom only)" name="intervalDays" type="number" tip={TIPS.intervalDays} />
+          <Field label="Start date" name="startDate" type="date" required tip={TIPS.startDate} />
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">End mode</span>
+            <span className="text-sm font-medium text-slate-700">
+              End mode
+              <InfoTip text={TIPS.endMode} />
+            </span>
             <select
               name="endMode"
               className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
@@ -145,17 +156,20 @@ export default async function NewBorrowerPage() {
               <option value="total">When a total is collected</option>
             </select>
           </label>
-          <Field label="End: number of payments" name="endCount" type="number" help="For 'After N payments'" />
-          <Field label="End: date" name="endDate" type="date" help="For 'On a fixed date'" />
-          <Field label="End: total (£)" name="endTotal" type="number" help="For 'When a total is collected'" />
+          <Field label="End: number of payments" name="endCount" type="number" help="For 'After N payments'" tip={TIPS.endCount} />
+          <Field label="End: date" name="endDate" type="date" help="For 'On a fixed date'" tip={TIPS.endDate} />
+          <Field label="End: total (£)" name="endTotal" type="number" help="For 'When a total is collected'" tip={TIPS.endTotal} />
         </Section>
         )}
 
         <Section title="VRP consent limits">
-          <CeilingSuggester />
-          <Field label="Ceiling for any single payment (£)" name="maxPaymentAmount" type="number" required placeholder="600.00" />
+          <CeilingSuggester ownAmount={!canSchedule} />
+          <Field label="Ceiling for any single payment (£)" name="maxPaymentAmount" type="number" required placeholder="600.00" tip={TIPS.maxPaymentAmount} />
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">The period is</span>
+            <span className="text-sm font-medium text-slate-700">
+              The period is
+              <InfoTip text={TIPS.consentPeriod} />
+            </span>
             <select
               name="consentPeriod"
               className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
@@ -167,9 +181,9 @@ export default async function NewBorrowerPage() {
               <option value="YEAR">Year</option>
             </select>
           </label>
-          <Field label="Ceiling across the whole period (£)" name="periodicMaxAmount" type="number" required placeholder="2400.00" />
-          <Field label="Valid from" name="consentValidFrom" type="datetime-local" />
-          <Field label="Valid to" name="consentValidTo" type="datetime-local" />
+          <Field label="Ceiling across the whole period (£)" name="periodicMaxAmount" type="number" required placeholder="2400.00" tip={TIPS.periodicMaxAmount} />
+          <Field label="Valid from" name="consentValidFrom" type="datetime-local" tip={TIPS.consentValidFrom} />
+          <Field label="Valid to" name="consentValidTo" type="datetime-local" tip={TIPS.consentValidTo} />
         </Section>
 
         <div className="flex justify-end gap-2">

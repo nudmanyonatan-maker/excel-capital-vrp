@@ -1,5 +1,7 @@
 "use client";
 
+import { InfoTip } from "@/components/info-tip";
+import { TIPS } from "@/lib/help-text";
 import { useActionState, useState } from "react";
 import {
   addDestinationAction,
@@ -160,22 +162,34 @@ function AddForm({ borrowerId, choices }: { borrowerId: string; choices: PayoutC
           label="Account to pay into"
         />
         <label className="block">
-          <span className={labelCls}>What to call it here (optional)</span>
+          <span className={labelCls}>
+            What to call it here (optional)
+            <InfoTip text={TIPS.destinationLabel} />
+          </span>
           <input name="label" placeholder="Backup account" className={field} />
           <span className="mt-1 block text-xs text-slate-500">
             Only staff see this. Leave it blank to use the account&apos;s own name.
           </span>
         </label>
         <label className="block">
-          <span className={labelCls}>Most in one payment (£)</span>
+          <span className={labelCls}>
+            Most in one payment (£)
+            <InfoTip text={TIPS.maxPaymentAmount} />
+          </span>
           <input name="maxPaymentAmount" required type="number" step="0.01" min="0.01" className={field} />
         </label>
         <label className="block">
-          <span className={labelCls}>Most in a period (£)</span>
+          <span className={labelCls}>
+            Most in a period (£)
+            <InfoTip text={TIPS.periodicMaxAmount} />
+          </span>
           <input name="periodicMaxAmount" required type="number" step="0.01" min="0.01" className={field} />
         </label>
         <label className="block">
-          <span className={labelCls}>Period the limit covers</span>
+          <span className={labelCls}>
+            Period the limit covers
+            <InfoTip text={TIPS.consentPeriod} />
+          </span>
           <select name="consentPeriod" defaultValue="MONTH" className={field}>
             <option value="DAY">Day</option>
             <option value="WEEK">Week</option>
@@ -184,7 +198,10 @@ function AddForm({ borrowerId, choices }: { borrowerId: string; choices: PayoutC
           </select>
         </label>
         <label className="block">
-          <span className={labelCls}>Mandate ends (optional)</span>
+          <span className={labelCls}>
+            Mandate ends (optional)
+            <InfoTip text={TIPS.consentValidTo} />
+          </span>
           <input name="consentValidTo" type="datetime-local" className={field} />
         </label>
       </div>

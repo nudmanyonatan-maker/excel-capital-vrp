@@ -1,4 +1,5 @@
 import type { PayoutChoice } from "@/lib/payout-accounts";
+import { InfoTip } from "@/components/info-tip";
 
 /**
  * Choose where a borrower's repayments are paid into, from the approved list.
@@ -13,12 +14,14 @@ export function PayoutAccountSelect({
   className,
   labelClassName = "text-sm font-medium text-slate-700",
   label = "Repayments are paid into",
+  tip,
 }: {
   choices: PayoutChoice[];
   defaultValue?: string;
   className?: string;
   labelClassName?: string;
   label?: string;
+  tip?: string;
 }) {
   if (choices.length === 0) {
     return (
@@ -33,6 +36,7 @@ export function PayoutAccountSelect({
       <span className={labelClassName}>
         {label}
         <span className="text-red-500"> *</span>
+        {tip && <InfoTip text={tip} />}
       </span>
       <select
         name="payoutAccountId"

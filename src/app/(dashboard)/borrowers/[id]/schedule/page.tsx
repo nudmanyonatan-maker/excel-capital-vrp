@@ -1,3 +1,5 @@
+import { InfoTip } from "@/components/info-tip";
+import { TIPS } from "@/lib/help-text";
 import Link from "next/link";
 import { SubmitButton } from "@/components/submit-button";
 import { notFound } from "next/navigation";
@@ -54,7 +56,10 @@ export default async function SchedulePage({
         <input type="hidden" name="borrowerId" value={id} />
         <div className="grid grid-cols-2 gap-4">
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Amount (£) *</span>
+            <span className="text-sm font-medium text-slate-700">
+            Amount (£) *
+            <InfoTip text={TIPS.amount} />
+          </span>
             <input
               name="amount"
               type="number"
@@ -65,7 +70,10 @@ export default async function SchedulePage({
             />
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Frequency *</span>
+            <span className="text-sm font-medium text-slate-700">
+            Frequency *
+            <InfoTip text={TIPS.frequency} />
+          </span>
             {/* A daily schedule is stored as custom/1-day (migration 0004), so the
                 raw column says "custom". Defaulting the picker to that meant
                 re-saving a Mon-Fri schedule submitted frequency=custom, the
@@ -85,15 +93,24 @@ export default async function SchedulePage({
           </label>
           <WeekdayPicker selected={parseDaysOfWeek(s?.days_of_week)} />
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Interval days (custom)</span>
+            <span className="text-sm font-medium text-slate-700">
+            Interval days (custom)
+            <InfoTip text={TIPS.intervalDays} />
+          </span>
             <input name="intervalDays" type="number" defaultValue={s?.interval_days ?? ""} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm" />
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Start date *</span>
+            <span className="text-sm font-medium text-slate-700">
+            Start date *
+            <InfoTip text={TIPS.startDate} />
+          </span>
             <input name="startDate" type="date" required defaultValue={s?.start_date ?? ""} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm" />
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">End mode *</span>
+            <span className="text-sm font-medium text-slate-700">
+            End mode *
+            <InfoTip text={TIPS.endMode} />
+          </span>
             <select name="endMode" defaultValue={s?.end_mode ?? "count"} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm">
               <option value="count">After N payments</option>
               <option value="date">On a fixed date</option>
@@ -101,15 +118,24 @@ export default async function SchedulePage({
             </select>
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">End: number of payments</span>
+            <span className="text-sm font-medium text-slate-700">
+            End: number of payments
+            <InfoTip text={TIPS.endCount} />
+          </span>
             <input name="endCount" type="number" defaultValue={s?.end_count ?? ""} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm" />
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">End: date</span>
+            <span className="text-sm font-medium text-slate-700">
+            End: date
+            <InfoTip text={TIPS.endDate} />
+          </span>
             <input name="endDate" type="date" defaultValue={s?.end_date ?? ""} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm" />
           </label>
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">End: total (£)</span>
+            <span className="text-sm font-medium text-slate-700">
+            End: total (£)
+            <InfoTip text={TIPS.endTotal} />
+          </span>
             <input name="endTotal" type="number" step="0.01" defaultValue={s?.end_total_minor ? fromMinorUnits(s.end_total_minor) : ""} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm" />
           </label>
         </div>
@@ -125,7 +151,10 @@ export default async function SchedulePage({
           // configuring the schedule before sending the setup link is the normal
           // order of work.
           <label className="block">
-            <span className="text-sm font-medium text-slate-700">Pay repayments into</span>
+            <span className="text-sm font-medium text-slate-700">
+            Pay repayments into
+            <InfoTip text={TIPS.scheduleDestination} />
+          </span>
             <select
               name="destinationConsentId"
               defaultValue={s?.consent_id ?? ""}

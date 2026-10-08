@@ -1,5 +1,7 @@
 "use client";
 
+import { InfoTip } from "@/components/info-tip";
+import { TIPS } from "@/lib/help-text";
 import { useActionState } from "react";
 import {
   updateBankAndLimitsAction,
@@ -103,6 +105,7 @@ export function BankLimitsForm({
         <label className="block">
           <span className="text-sm font-medium text-slate-700">
             Ceiling for any single payment
+            <InfoTip text={TIPS.maxPaymentAmount} />
           </span>
           <input
             name="maxPaymentAmount"
@@ -119,6 +122,7 @@ export function BankLimitsForm({
         <label className="block">
           <span className="text-sm font-medium text-slate-700">
             Ceiling across the whole period
+            <InfoTip text={TIPS.periodicMaxAmount} />
           </span>
           <input
             name="periodicMaxAmount"
@@ -134,7 +138,10 @@ export function BankLimitsForm({
         </label>
       </div>
       <label className="block">
-        <span className="text-sm font-medium text-slate-700">The period is</span>
+        <span className="text-sm font-medium text-slate-700">
+          The period is
+          <InfoTip text={TIPS.consentPeriod} />
+        </span>
         <select
           name="consentPeriod"
           defaultValue={shown.consentPeriod || "MONTH"}

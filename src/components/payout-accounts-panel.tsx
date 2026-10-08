@@ -1,5 +1,7 @@
 "use client";
 
+import { InfoTip } from "@/components/info-tip";
+import { TIPS } from "@/lib/help-text";
 import { useActionState, useState } from "react";
 import {
   addPayoutAccountAction,
@@ -97,6 +99,7 @@ function SalesToggle({ id, allowed }: { id: string; allowed: boolean }) {
       <input type="hidden" name="allowed" value={allowed ? "false" : "true"} />
       <span className={`mr-2 text-xs ${allowed ? "text-emerald-700" : "text-slate-500"}`}>
         {allowed ? "Sales reps can use" : "Not for sales reps"}
+        <InfoTip text={TIPS.salesCanUse} />
       </span>
       <button
         type="submit"
@@ -120,20 +123,32 @@ function AddForm() {
       <h3 className="mb-3 text-sm font-semibold text-slate-900">Add an account</h3>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="block">
-          <span className={labelCls}>What staff will see</span>
+          <span className={labelCls}>
+            What staff will see
+            <InfoTip text={TIPS.payoutLabel} />
+          </span>
           <input name="label" required placeholder="Excel Capital" className={field} />
         </label>
         <label className="block">
-          <span className={labelCls}>Name on the account</span>
+          <span className={labelCls}>
+            Name on the account
+            <InfoTip text={TIPS.payoutName} />
+          </span>
           <input name="recipientName" required maxLength={18} placeholder="Excel Capital" className={field} />
           <span className="mt-1 block text-xs text-slate-500">18 characters at most.</span>
         </label>
         <label className="block">
-          <span className={labelCls}>Account number</span>
+          <span className={labelCls}>
+            Account number
+            <InfoTip text={TIPS.payoutAccountNumber} />
+          </span>
           <input name="accountNumber" required inputMode="numeric" placeholder="12345678" className={field} />
         </label>
         <label className="block">
-          <span className={labelCls}>Sort code</span>
+          <span className={labelCls}>
+            Sort code
+            <InfoTip text={TIPS.payoutSortCode} />
+          </span>
           <input name="sortCode" required inputMode="numeric" placeholder="12-34-56" className={field} />
         </label>
       </div>
@@ -168,11 +183,17 @@ function AdoptRow({ row }: { row: UnlinkedRow }) {
           </div>
         </div>
         <label className="block">
-          <span className={labelCls}>What staff will see</span>
+          <span className={labelCls}>
+            What staff will see
+            <InfoTip text={TIPS.payoutLabel} />
+          </span>
           <input name="label" required defaultValue={row.name} className={field} />
         </label>
         <label className="block">
-          <span className={labelCls}>Name on the account</span>
+          <span className={labelCls}>
+            Name on the account
+            <InfoTip text={TIPS.payoutName} />
+          </span>
           <input name="recipientName" required maxLength={18} defaultValue={row.name} className={field} />
         </label>
         <button

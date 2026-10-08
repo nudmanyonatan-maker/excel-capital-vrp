@@ -9,6 +9,8 @@ import { listPaymentsForBorrower, collectionProgress } from "@/lib/repo/payments
 import { latestSetupLinkForBorrower } from "@/lib/repo/setup-links";
 import { getCurrentUser, hasRole } from "@/lib/auth";
 import { maskAccount, maskSortCode, payoutChoicesFor } from "@/lib/payout-accounts";
+import { InfoTip } from "@/components/info-tip";
+import { TIPS } from "@/lib/help-text";
 import { setBorrowerStatusFormAction } from "@/lib/actions/borrowers";
 import { ActionForm } from "@/components/action-form";
 import { StatusBadge } from "@/components/status-badge";
@@ -314,29 +316,41 @@ export default async function BorrowerProfile({
       {canOnboard && (
         <div className="mb-6 flex flex-wrap items-start gap-3 rounded-lg border border-slate-200 bg-white p-4">
           {canOperate && (
-            <ExecuteNowButton
-              borrowerId={borrower.id}
-              nonce={crypto.randomUUID()}
-              amountLabel={schedule ? formatMinor(schedule.amount_minor, schedule.currency) : "the entered amount"}
-              destinationLabel={scheduleDestination?.label ?? null}
-            />
+            <span className="flex items-start gap-0.5">
+              <ExecuteNowButton
+                borrowerId={borrower.id}
+                nonce={crypto.randomUUID()}
+                amountLabel={schedule ? formatMinor(schedule.amount_minor, schedule.currency) : "the entered amount"}
+                destinationLabel={scheduleDestination?.label ?? null}
+              />
+              <span className="pt-2"><InfoTip text={TIPS.executeNow} /></span>
+            </span>
           )}
-          <SetupLinkButton borrowerId={borrower.id} />
+          <span className="flex items-start gap-0.5">
+            <SetupLinkButton borrowerId={borrower.id} />
+            <span className="pt-2"><InfoTip text={TIPS.setupLink} /></span>
+          </span>
           {defaultReady && (
             // Only once the default account can take money: before that the bank
             // would refuse it, and a button that can only fail teaches nothing.
-            <TestPaymentButton
-              borrowerId={borrower.id}
-              nonce={crypto.randomUUID()}
-              destinationLabel={defaultReady.label}
-            />
+            <span className="flex items-start gap-0.5">
+              <TestPaymentButton
+                borrowerId={borrower.id}
+                nonce={crypto.randomUUID()}
+                destinationLabel={defaultReady.label}
+              />
+              <span className="pt-2"><InfoTip text={TIPS.testPayment} /></span>
+            </span>
           )}
           {canOperate && (
-            <OneOffPaymentButton
-              borrowerId={borrower.id}
-              nonce={crypto.randomUUID()}
-              destinations={collectableChoices}
-            />
+            <span className="flex items-start gap-0.5">
+              <OneOffPaymentButton
+                borrowerId={borrower.id}
+                nonce={crypto.randomUUID()}
+                destinations={collectableChoices}
+              />
+              <span className="pt-2"><InfoTip text={TIPS.oneOff} /></span>
+            </span>
           )}
           {canOperate && (
           <ActionForm action={setBorrowerStatusFormAction}>
@@ -348,12 +362,16 @@ export default async function BorrowerProfile({
             >
               {paused ? "Resume collections" : "Pause collections"}
             </SubmitButton>
+            <span className="ml-0.5"><InfoTip text={TIPS.pause} /></span>
           </ActionForm>
           )}
           {/* Archive, never delete. Refuses while collections could still run,
               because hiding a borrower does not stop taking their money. */}
           {canOperate && (
-            <ArchiveBorrowerButton borrowerId={borrower.id} borrowerName={borrower.legal_name} />
+            <span className="flex items-start gap-0.5">
+              <ArchiveBorrowerButton borrowerId={borrower.id} borrowerName={borrower.legal_name} />
+              <span className="pt-2"><InfoTip text={TIPS.archive} /></span>
+            </span>
           )}
         </div>
       )}

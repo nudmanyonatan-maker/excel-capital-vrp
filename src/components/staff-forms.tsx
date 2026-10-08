@@ -1,5 +1,7 @@
 "use client";
 
+import { InfoTip } from "@/components/info-tip";
+import { TIPS } from "@/lib/help-text";
 import { useActionState } from "react";
 import {
   addStaffAction,
@@ -18,7 +20,10 @@ export function AddStaffForm() {
   return (
     <form action={formAction} className="flex flex-wrap items-end gap-3">
       <label className="block">
-        <span className="text-sm font-medium text-slate-700">Email</span>
+        <span className="text-sm font-medium text-slate-700">
+          Email
+          <InfoTip text={TIPS.staffEmail} />
+        </span>
         <input
           name="email"
           type="email"
@@ -28,7 +33,10 @@ export function AddStaffForm() {
         />
       </label>
       <label className="block">
-        <span className="text-sm font-medium text-slate-700">Role</span>
+        <span className="text-sm font-medium text-slate-700">
+          Role
+          <InfoTip text={TIPS.staffRole} />
+        </span>
         <select
           name="role"
           defaultValue="viewer"
