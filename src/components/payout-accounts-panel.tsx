@@ -5,6 +5,7 @@ import {
   addPayoutAccountAction,
   adoptExistingAccountAction,
   archivePayoutAccountAction,
+  setSalesCanUseAction,
   type PayoutAccountState,
 } from "@/lib/actions/payout-accounts";
 
@@ -14,6 +15,7 @@ export interface PayoutAccountRow {
   name: string;
   masked: string;
   archived: boolean;
+  salesCanUse: boolean;
 }
 
 export interface UnlinkedRow {
@@ -79,6 +81,30 @@ function ArchiveButton({ id, label }: { id: string; label: string }) {
           Remove from list
         </button>
       )}
+      <Message state={state} />
+    </form>
+  );
+}
+
+function SalesToggle({ id, allowed }: { id: string; allowed: boolean }) {
+  const [state, action, pending] = useActionState<PayoutAccountState, FormData>(
+    setSalesCanUseAction,
+    null,
+  );
+  return (
+    <form action={action}>
+      <input type="hidden" name="payoutAccountId" value={id} />
+      <input type="hidden" name="allowed" value={allowed ? "false" : "true"} />
+      <span className={`mr-2 text-xs ${allowed ? "text-emerald-700" : "text-slate-500"}`}>
+        {allowed ? "Sales reps can use" : "Not for sales reps"}
+      </span>
+      <button
+        type="submit"
+        disabled={pending}
+        className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs font-medium hover:bg-slate-50 disabled:opacity-50"
+      >
+        {pending ? "…" : allowed ? "Close to sales" : "Open to sales"}
+      </button>
       <Message state={state} />
     </form>
   );
@@ -193,7 +219,10 @@ export function PayoutAccountsPanel({
                   {a.name} · {a.masked}
                 </div>
               </div>
-              <ArchiveButton id={a.id} label={a.label} />
+              <div className="flex flex-col items-end gap-2">
+                <SalesToggle id={a.id} allowed={a.salesCanUse} />
+                <ArchiveButton id={a.id} label={a.label} />
+              </div>
             </li>
           ))}
         </ul>

@@ -14,6 +14,7 @@ import { ActionForm } from "@/components/action-form";
 import { StatusBadge } from "@/components/status-badge";
 import {
   ExecuteNowButton,
+  TestPaymentButton,
   OneOffPaymentButton,
   RetryButton,
   SetupLinkButton,
@@ -140,6 +141,8 @@ export default async function BorrowerProfile({
     ...(await collectionProgress(db, id, schedule?.id)),
   });
   const canOperate = user ? hasRole(user, "operator") : false;
+  // Sales reps and up: setting a borrower up, never collecting from them.
+  const canOnboard = user ? hasRole(user, "sales") : false;
   const paused = borrower.status === "paused";
   // Surface an incomplete setup here rather than letting the borrower hit it, for
   // every account they will be asked to approve rather than only one.
@@ -190,6 +193,9 @@ export default async function BorrowerProfile({
       masked: r.masked,
     }));
 
+  // The account a £1 test goes to: the default, and only once it can take money.
+  const defaultReady = destinationRows.find((r) => r.isDefault && r.blockedReason === null && r.consentId) ?? null;
+
   // Which account "Execute payment now" will use: the schedule's, else the
   // default. Named only when there is a choice to be confused about.
   const scheduleDestination =
@@ -232,7 +238,7 @@ export default async function BorrowerProfile({
         setup={setup}
       />
 
-      {canOperate && failure && (
+      {canOnboard && failure && (
         <div className="mb-6 rounded-lg border border-red-300 bg-red-50 p-4">
           <h2 className="text-sm font-semibold text-red-900">
             The borrower&apos;s last attempt to connect their bank failed
@@ -268,7 +274,7 @@ export default async function BorrowerProfile({
         </div>
       )}
 
-      {canOperate && readiness.ready && setup.awaitingBorrower > 0 && (
+      {canOnboard && readiness.ready && setup.awaitingBorrower > 0 && (
         // Named here as well as in the summary tile, because this is the state
         // staff act on: everything on our side is done and the borrower has not
         // finished. Only shown when there is nothing left for staff to fix, so it
@@ -283,7 +289,7 @@ export default async function BorrowerProfile({
         </div>
       )}
 
-      {canOperate && !readiness.ready && (
+      {canOnboard && !readiness.ready && (
         <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4">
           <h2 className="text-sm font-semibold text-amber-900">
             Not ready to send to the borrower yet
@@ -305,20 +311,34 @@ export default async function BorrowerProfile({
         </div>
       )}
 
-      {canOperate && (
+      {canOnboard && (
         <div className="mb-6 flex flex-wrap items-start gap-3 rounded-lg border border-slate-200 bg-white p-4">
-          <ExecuteNowButton
-            borrowerId={borrower.id}
-            nonce={crypto.randomUUID()}
-            amountLabel={schedule ? formatMinor(schedule.amount_minor, schedule.currency) : "the entered amount"}
-            destinationLabel={scheduleDestination?.label ?? null}
-          />
+          {canOperate && (
+            <ExecuteNowButton
+              borrowerId={borrower.id}
+              nonce={crypto.randomUUID()}
+              amountLabel={schedule ? formatMinor(schedule.amount_minor, schedule.currency) : "the entered amount"}
+              destinationLabel={scheduleDestination?.label ?? null}
+            />
+          )}
           <SetupLinkButton borrowerId={borrower.id} />
-          <OneOffPaymentButton
-            borrowerId={borrower.id}
-            nonce={crypto.randomUUID()}
-            destinations={collectableChoices}
-          />
+          {defaultReady && (
+            // Only once the default account can take money: before that the bank
+            // would refuse it, and a button that can only fail teaches nothing.
+            <TestPaymentButton
+              borrowerId={borrower.id}
+              nonce={crypto.randomUUID()}
+              destinationLabel={defaultReady.label}
+            />
+          )}
+          {canOperate && (
+            <OneOffPaymentButton
+              borrowerId={borrower.id}
+              nonce={crypto.randomUUID()}
+              destinations={collectableChoices}
+            />
+          )}
+          {canOperate && (
           <ActionForm action={setBorrowerStatusFormAction}>
             <input type="hidden" name="borrowerId" value={borrower.id} />
             <input type="hidden" name="status" value={paused ? "active" : "paused"} />
@@ -329,9 +349,12 @@ export default async function BorrowerProfile({
               {paused ? "Resume collections" : "Pause collections"}
             </SubmitButton>
           </ActionForm>
+          )}
           {/* Archive, never delete. Refuses while collections could still run,
               because hiding a borrower does not stop taking their money. */}
-          <ArchiveBorrowerButton borrowerId={borrower.id} borrowerName={borrower.legal_name} />
+          {canOperate && (
+            <ArchiveBorrowerButton borrowerId={borrower.id} borrowerName={borrower.legal_name} />
+          )}
         </div>
       )}
 
@@ -339,7 +362,7 @@ export default async function BorrowerProfile({
         <Card
           title="Business"
           action={
-            canOperate ? (
+            canOnboard ? (
               <Link href={`/borrowers/${borrower.id}/edit`} className="text-xs text-slate-500 hover:underline">
                 Edit
               </Link>

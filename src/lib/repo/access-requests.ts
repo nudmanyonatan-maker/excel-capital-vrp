@@ -1,6 +1,7 @@
 import type { Role } from "@/lib/types";
 import { newId } from "@/lib/ids";
 import { createStaff, getStaffByEmail } from "@/lib/repo/staff";
+import { storedRole } from "@/lib/roles";
 
 export interface AccessRequest {
   id: string;
@@ -106,7 +107,10 @@ export async function decideRequest(
       opts.approve ? "approved" : "denied",
       now,
       opts.decidedBy,
-      opts.approve ? opts.role! : null,
+      // granted_role has the same CHECK as staff_users.role, so it records the
+      // stored form. A sales grant reads back as "viewer" here; the staff row
+      // created below carries the real role.
+      opts.approve ? storedRole(opts.role!).role : null,
       opts.id,
     )
     .run();

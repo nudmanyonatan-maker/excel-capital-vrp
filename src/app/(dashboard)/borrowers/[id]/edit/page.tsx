@@ -4,12 +4,11 @@ import { getCurrentUser, hasRole } from "@/lib/auth";
 import { getDb } from "@/lib/db";
 import { getBorrower } from "@/lib/repo/borrowers";
 import { listDestinations } from "@/lib/repo/destinations";
-import { unprotectString } from "@/lib/crypto";
 import { getEnv } from "@/lib/db";
 import { updateBorrowerDetailsFormAction } from "@/lib/actions/borrowers";
 import { ActionForm } from "@/components/action-form";
 import { BankLimitsForm } from "@/components/bank-limits-form";
-import { maskAccount, maskSortCode, payoutChoicesFor } from "@/lib/payout-accounts";
+import { describeStoredAccount, payoutChoicesFor } from "@/lib/payout-accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -20,23 +19,19 @@ export default async function EditBorrowerPage({
 }) {
   const { id } = await params;
 
-  // Operators only. The dashboard layout proves you are STAFF, which includes
-  // read-only viewers, and this page decrypts the destination account number and
-  // sort code and puts them on screen in full. Every other surface masks them and
-  // hides the controls behind an operator check; this one was reachable by URL,
-  // so a viewer could read the raw bank details of every borrower. The actions
-  // behind the forms were guarded, so nothing could be saved -- the leak was the
-  // reading.
+  // Sales reps and up. A viewer cannot change anything, so the forms are no use
+  // to them. This page no longer shows full bank details to anyone: the account
+  // is chosen from the approved list and only ever shown masked.
   const user = await getCurrentUser();
-  if (!user || !hasRole(user, "operator")) {
+  if (!user || !hasRole(user, "sales")) {
     return (
       <div className="mx-auto max-w-2xl">
         <Link href={`/borrowers/${id}`} className="text-sm text-slate-500 hover:underline">
           ← Back to borrower
         </Link>
         <p className="mt-4 rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
-          You have view-only access, so you cannot edit a borrower or see their full bank
-          details. Ask an operator if something here needs changing.
+          You have view-only access, so you cannot edit a borrower. Ask an operator if
+          something here needs changing.
         </p>
       </div>
     );
@@ -65,12 +60,7 @@ export default async function EditBorrowerPage({
   // because nobody needs the full number to recognise it.
   const current =
     recipient && !recipient.payout_account_id
-      ? `${recipient.name} (${[
-          maskAccount(await unprotectString(recipient.account_number, env.APP_ENCRYPTION_KEY)),
-          maskSortCode(await unprotectString(recipient.sort_code, env.APP_ENCRYPTION_KEY)),
-        ]
-          .filter(Boolean)
-          .join(" / ")})`
+      ? await describeStoredAccount(recipient, env.APP_ENCRYPTION_KEY)
       : null;
   const major = (minor: number | null | undefined) =>
     minor == null ? "" : (minor / 100).toFixed(2);

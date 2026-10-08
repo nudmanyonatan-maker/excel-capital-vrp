@@ -12,6 +12,7 @@ import {
   type ActionResult,
   type ActionTone,
 } from "@/lib/actions/payments";
+import { sendTestPaymentAction } from "@/lib/actions/test-payment";
 import { DestinationPicker, type DestinationChoice } from "@/components/destination-picker";
 
 const btn =
@@ -188,6 +189,76 @@ export function ExecuteNowButton({
             className={`${btn} bg-slate-900 text-white hover:bg-slate-700`}
           >
             Execute payment now
+          </button>
+        )}
+      </form>
+      {state && !dismissed && (
+        <ResultBanner result={state} onDismiss={() => setDismissed(true)} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Send £1 to prove a borrower's bank connection works. The amount is fixed, not
+ * typed, and it always goes to the default account, so this is safe to give a
+ * sales rep. Still asks before sending, because it is real money.
+ */
+export function TestPaymentButton({
+  borrowerId,
+  nonce,
+  destinationLabel,
+}: {
+  borrowerId: string;
+  nonce: string;
+  destinationLabel: string;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [state, formAction, pending] = useActionState<ActionState, FormData>(
+    sendTestPaymentAction,
+    null,
+  );
+  const [dismissed, setDismissed] = useState(false);
+  const [seenState, setSeenState] = useState(state);
+  if (state !== seenState) {
+    setSeenState(state);
+    setConfirming(false);
+    setDismissed(false);
+  }
+
+  return (
+    <div>
+      <form action={formAction} className="flex flex-wrap items-center gap-2">
+        <input type="hidden" name="borrowerId" value={borrowerId} />
+        <input type="hidden" name="nonce" value={nonce} />
+        {confirming ? (
+          <>
+            <span className="text-sm font-medium text-amber-800">
+              Take £1 from the borrower into {destinationLabel}?
+            </span>
+            <button
+              type="submit"
+              disabled={pending}
+              className={`${btn} bg-slate-900 text-white hover:bg-slate-700`}
+            >
+              {pending ? "Sending…" : "Send £1 test"}
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setConfirming(false)}
+              className={`${btn} border border-slate-300 bg-white hover:bg-slate-50`}
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirming(true)}
+            className={`${btn} border border-slate-300 bg-white hover:bg-slate-50`}
+          >
+            Send £1 test payment
           </button>
         )}
       </form>

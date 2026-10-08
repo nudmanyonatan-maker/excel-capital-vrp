@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { getDb, getEnv } from "@/lib/db";
 import { getAuthenticatedEmail } from "@/lib/access";
 import { requireRole } from "@/lib/auth";
+import { isRole } from "@/lib/roles";
 import { writeAudit } from "@/lib/repo/audit";
 import {
   requestAccess,
@@ -80,8 +81,10 @@ export async function decideRequestAction(
 
   const id = String(fd.get("requestId") ?? "");
   const approve = String(fd.get("decision") ?? "") === "approve";
-  const role = String(fd.get("role") ?? "") as Role;
+  const rawRole = String(fd.get("role") ?? "");
   if (!id) return { error: "No request was selected." };
+  if (approve && !isRole(rawRole)) return { error: "Choose a role before approving." };
+  const role = rawRole as Role;
 
   const before = await getRequest(db, id);
   try {

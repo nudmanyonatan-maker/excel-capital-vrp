@@ -1,6 +1,10 @@
 /** Row types mirroring the D1 schema (migrations/0001_init.sql). */
 
-export type Role = "admin" | "operator" | "viewer";
+/**
+ * "sales" is stored as a viewer plus a flag (migration 0013); repo/staff.ts maps
+ * it. Everything above the repo layer sees the real role.
+ */
+export type Role = "admin" | "operator" | "sales" | "viewer";
 
 export type BorrowerStatus =
   | "onboarding"
@@ -93,6 +97,8 @@ export interface PayoutAccount {
   account_number: string;
   /** Encrypted at the app layer. */
   sort_code: string;
+  /** Whether sales reps may choose it. Admins and operators may choose any. */
+  sales_can_use: number;
   archived_at: string | null;
   created_at: string;
   created_by: string | null;

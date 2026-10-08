@@ -38,7 +38,9 @@ export async function sendSetupLinkAction(
   _prev: SetupLinkState,
   fd: FormData,
 ): Promise<SetupLinkState> {
-  const user = await requireRole("operator");
+  // Sending the borrower their link is the point of a sales rep's job. It moves
+  // no money: the borrower still has to approve at their own bank.
+  const user = await requireRole("sales");
   const db = getDb();
   const env = getEnv();
   const borrowerId = fd.get("borrowerId");

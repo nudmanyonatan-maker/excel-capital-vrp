@@ -8,8 +8,7 @@ import {
   type StaffActionState,
 } from "@/lib/actions/staff";
 import type { Role } from "@/lib/types";
-
-const ROLES: Role[] = ["admin", "operator", "viewer"];
+import { ROLES, ROLE_INFO } from "@/lib/roles";
 
 export function AddStaffForm() {
   const [state, formAction, pending] = useActionState<StaffActionState, FormData>(
@@ -33,11 +32,11 @@ export function AddStaffForm() {
         <select
           name="role"
           defaultValue="viewer"
-          className="mt-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm capitalize"
+          className="mt-1 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         >
           {ROLES.map((r) => (
             <option key={r} value={r}>
-              {r}
+              {ROLE_INFO[r].name}
             </option>
           ))}
         </select>
@@ -68,11 +67,11 @@ export function StaffRoleForm({ staffId, role }: { staffId: string; role: Role }
         <select
           name="role"
           defaultValue={role}
-          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm capitalize"
+          className="rounded-md border border-slate-300 bg-white px-2 py-1 text-sm"
         >
           {ROLES.map((r) => (
             <option key={r} value={r}>
-              {r}
+              {ROLE_INFO[r].name}
             </option>
           ))}
         </select>

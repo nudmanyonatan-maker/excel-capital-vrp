@@ -66,6 +66,7 @@ export default async function SettingsPage() {
             all.map(async (a) => ({
               ...(await describePayoutAccount(a, env.APP_ENCRYPTION_KEY)),
               archived: a.archived_at != null,
+              salesCanUse: a.sales_can_use === 1,
             })),
           ),
         ),

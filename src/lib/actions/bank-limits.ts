@@ -45,7 +45,9 @@ export async function updateBankAndLimitsAction(
   _prev: BankLimitsState,
   fd: FormData,
 ): Promise<BankLimitsState> {
-  const user = await requireRole("operator");
+  // Sales reps set limits and choose the account as part of onboarding. The
+  // account can only come from those an admin opened to them.
+  const user = await requireRole("sales");
   const db = getDb();
 
   const borrowerId = String(fd.get("borrowerId") ?? "");

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import type { Role } from "@/lib/types";
 
 const LINKS = [
   { href: "/borrowers", label: "Borrowers" },
@@ -15,7 +16,7 @@ export function Nav({
   role,
   pendingRequests = 0,
 }: {
-  role: "admin" | "operator" | "viewer";
+  role: Role;
   /** Shown as a badge on Staff so waiting people are noticed without an email. */
   pendingRequests?: number;
 }) {

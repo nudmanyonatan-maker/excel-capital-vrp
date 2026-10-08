@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getDb, getEnv } from "@/lib/db";
-import { requireRole } from "@/lib/auth";
+import { hasRole, requireRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/repo/audit";
 import {
   getCompaniesHouseClient,
@@ -47,7 +47,10 @@ function days(fd: FormData): number[] | null {
 }
 
 export async function createBorrowerAction(fd: FormData): Promise<void> {
-  const user = await requireRole("operator");
+  // Sales reps onboard borrowers too. What they cannot do here is set the
+  // repayment schedule: that is decided below, by role, not by which fields the
+  // form happened to send.
+  const user = await requireRole("sales");
   const db = getDb();
   const env = getEnv();
 
@@ -147,7 +150,7 @@ export async function createBorrowerAction(fd: FormData): Promise<void> {
   const frequency = str(fd, "frequency") as Frequency | null;
   const startDate = str(fd, "startDate");
   const endMode = (str(fd, "endMode") as EndMode | null) ?? "count";
-  if (amountMinor && frequency && startDate) {
+  if (amountMinor && frequency && startDate && hasRole(user, "operator")) {
     await upsertSchedule(db, borrower.id, {
       amountMinor,
       frequency,
@@ -234,7 +237,9 @@ export async function updateScheduleAction(fd: FormData): Promise<void> {
 }
 
 export async function updateBorrowerDetailsAction(fd: FormData): Promise<void> {
-  const user = await requireRole("operator");
+  // Correcting a contact email or a company name is part of setting a borrower
+  // up, so a sales rep can do it. It moves no money.
+  const user = await requireRole("sales");
   const db = getDb();
   const borrowerId = str(fd, "borrowerId");
   if (!borrowerId) throw new Error("borrowerId required");
@@ -351,7 +356,7 @@ export async function updateBorrowerDetailsFormAction(
   // what the form actually calls, so it is its own entry point and has to stand
   // on its own. Before reportRefusal, so an authorisation failure propagates as
   // one rather than being shown as an ordinary validation message.
-  await requireRole("operator");
+  await requireRole("sales");
   return reportRefusal(
     "update borrower details",
     () => updateBorrowerDetailsAction(fd),
@@ -384,7 +389,7 @@ export async function createBorrowerFormAction(
   // only reachable through another function is the kind that quietly disappears.
   // It also runs OUTSIDE the try, so a viewer is refused outright rather than
   // being handed "not authorised" as if it were a validation message.
-  await requireRole("operator");
+  await requireRole("sales");
 
   try {
     await createBorrowerAction(fd);

@@ -9,7 +9,12 @@ import {
 } from "@/lib/repo/staff";
 import type { Role, StaffUser } from "@/lib/types";
 
-const ROLE_RANK: Record<Role, number> = { viewer: 0, operator: 1, admin: 2 };
+/**
+ * A sales rep sits between viewer and operator: everything guarded at "sales"
+ * (onboarding, setup links, the £1 test) is theirs, and everything guarded at
+ * "operator" (schedules, collections, pausing, archiving) is not.
+ */
+const ROLE_RANK: Record<Role, number> = { viewer: 0, sales: 1, operator: 2, admin: 3 };
 
 export class AuthError extends Error {
   constructor(
