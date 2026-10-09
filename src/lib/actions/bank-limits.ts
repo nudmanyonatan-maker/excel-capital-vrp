@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDb } from "@/lib/db";
+import { getDb, getEnv } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { writeAudit } from "@/lib/repo/audit";
 import { addRecipient, listDestinations, updateRecipient } from "@/lib/repo/destinations";
@@ -10,7 +10,9 @@ import {
   updateUnauthorisedConsentLimits,
   setConsentRecipient,
 } from "@/lib/repo/consents";
-import { parseLimits } from "@/lib/borrower-setup-input";
+import { parseLimits, parsePayerAccount } from "@/lib/borrower-setup-input";
+import { protectString, unprotectString } from "@/lib/crypto";
+import { getBorrower, setBorrowerPayerAccount } from "@/lib/repo/borrowers";
 import { choosePayoutAccount, recipientFieldsFrom } from "@/lib/payout-accounts";
 
 /**
@@ -18,6 +20,8 @@ import { choosePayoutAccount, recipientFieldsFrom } from "@/lib/payout-accounts"
  * the operator's typing. Without it, fixing one field silently clears the rest.
  */
 export interface BankLimitsValues {
+  payerAccount: string;
+  payerSort: string;
   payoutAccountId: string;
   maxPaymentAmount: string;
   periodicMaxAmount: string;
@@ -54,6 +58,8 @@ export async function updateBankAndLimitsAction(
   if (!borrowerId) return { errors: ["Something went wrong: no borrower was selected."] };
 
   const values: BankLimitsValues = {
+    payerAccount: String(fd.get("payerAccount") ?? ""),
+    payerSort: String(fd.get("payerSort") ?? ""),
     payoutAccountId: String(fd.get("payoutAccountId") ?? ""),
     maxPaymentAmount: String(fd.get("maxPaymentAmount") ?? ""),
     periodicMaxAmount: String(fd.get("periodicMaxAmount") ?? ""),
@@ -66,7 +72,14 @@ export async function updateBankAndLimitsAction(
   });
   // Chosen from the approved list, never typed: see choosePayoutAccount.
   const payout = await choosePayoutAccount(db, user, values.payoutAccountId);
-  const errors = [...(payout.ok ? [] : [payout.reason]), ...parsed.errors];
+  // Left blank means keep the business account already on file.
+  const payerGiven = Boolean(values.payerAccount.trim() || values.payerSort.trim());
+  const payer = payerGiven ? parsePayerAccount(values.payerAccount, values.payerSort) : null;
+  const errors = [
+    ...(payout.ok ? [] : [payout.reason]),
+    ...(payer?.errors ?? []),
+    ...parsed.errors,
+  ];
   if (errors.length > 0 || !parsed.value || !payout.ok) return { errors, values };
   const v = parsed.value;
   const fields = recipientFieldsFrom(payout.account);
@@ -131,6 +144,22 @@ export async function updateBankAndLimitsAction(
       period: v.period,
       validTo: v.validTo,
     });
+  }
+
+  if (payer?.value) {
+    const env = getEnv();
+    const borrower = await getBorrower(db, borrowerId);
+    const [currentAccount, currentSort] = await Promise.all([
+      unprotectString(borrower?.payer_account_number, env.APP_ENCRYPTION_KEY),
+      unprotectString(borrower?.payer_sort_code, env.APP_ENCRYPTION_KEY),
+    ]);
+    if (currentAccount !== payer.value.accountNumber || currentSort !== payer.value.sortCode) {
+      const { detachedPending } = await setBorrowerPayerAccount(db, borrowerId, {
+        accountNumber: (await protectString(payer.value.accountNumber, env.APP_ENCRYPTION_KEY))!,
+        sortCode: (await protectString(payer.value.sortCode, env.APP_ENCRYPTION_KEY))!,
+      });
+      needsNewLink ||= detachedPending > 0;
+    }
   }
 
   await writeAudit(db, {

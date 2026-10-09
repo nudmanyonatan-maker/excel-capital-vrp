@@ -112,6 +112,18 @@ export default async function NewBorrowerPage() {
           <Field label="Contact phone" name="contactPhone" tip={TIPS.contactPhone} />
         </Section>
 
+        <Section title="Where repayments come from">
+          <Field
+            label="Business account number"
+            name="payerAccount"
+            required
+            placeholder="12345678"
+            help="The borrower's business account, not a personal one."
+            tip={TIPS.payerAccount}
+          />
+          <Field label="Business sort code" name="payerSort" required placeholder="12-34-56" tip={TIPS.payerAccount} />
+        </Section>
+
         <Section title="Where repayments go">
           <PayoutAccountSelect choices={payoutChoices} tip={TIPS.payoutAccount} />
         </Section>

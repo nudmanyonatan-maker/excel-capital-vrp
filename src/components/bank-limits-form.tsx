@@ -23,6 +23,7 @@ export function BankLimitsForm({
   locked,
   choices,
   current,
+  payerMasked,
   defaults,
 }: {
   borrowerId: string;
@@ -34,7 +35,11 @@ export function BankLimitsForm({
    * approved list existed. Shown so nobody wonders where the old one went.
    */
   current: string | null;
+  /** The business account mandates are locked to, masked, or null if none yet. */
+  payerMasked: string | null;
   defaults: {
+    payerAccount: string;
+    payerSort: string;
     payoutAccountId: string;
     maxPaymentAmount: string;
     periodicMaxAmount: string;
@@ -87,6 +92,28 @@ export function BankLimitsForm({
         </p>
       )}
       <PayoutAccountSelect choices={choices} defaultValue={shown.payoutAccountId || undefined} />
+
+      <div className="border-t border-slate-100 pt-4">
+        <h2 className="text-sm font-semibold text-slate-900">
+          Where repayments come from
+          <InfoTip text={TIPS.payerAccount} />
+        </h2>
+        <p className="mt-0.5 text-xs text-slate-500">
+          {payerMasked
+            ? `Locked to the business account ${payerMasked}. Leave these blank to keep it.`
+            : "Not locked yet, so the borrower could approve from any account. Add their business account."}
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">Business account number</span>
+          <input name="payerAccount" inputMode="numeric" placeholder="12345678" defaultValue={shown.payerAccount} className={input} />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">Business sort code</span>
+          <input name="payerSort" inputMode="numeric" placeholder="12-34-56" defaultValue={shown.payerSort} className={input} />
+        </label>
+      </div>
 
       <div className="border-t border-slate-100 pt-4">
         <h2 className="text-sm font-semibold text-slate-900">Payment limits</h2>

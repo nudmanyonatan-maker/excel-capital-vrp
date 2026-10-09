@@ -77,6 +77,26 @@ describe("createConsent wire format", () => {
     ]);
   });
 
+  it("locks the mandate to the payer's account when one is given", async () => {
+    const cap = captureFetch();
+    await client.createConsent("recipient-1", "EXCELCAP", fullConstraints, {
+      name: "AKA TAXI RENTALS LIMITED",
+      accountNumber: "87654321",
+      sortCode: "040004",
+    });
+
+    expect(cap.body().payer_details).toEqual({
+      name: "AKA TAXI RENTALS LIMITED",
+      numbers: { bacs: { account: "87654321", sort_code: "040004" } },
+    });
+  });
+
+  it("sends no payer lock when none is given", async () => {
+    const cap = captureFetch();
+    await client.createConsent("recipient-1", "EXCELCAP", fullConstraints);
+    expect(cap.body()).not.toHaveProperty("payer_details");
+  });
+
   it("defaults to CONSENT alignment, the only one Monzo accepts", async () => {
     // Plaid: "If the institution is Monzo, only CONSENT alignments are
     // supported." A CALENDAR default refused every Monzo borrower with

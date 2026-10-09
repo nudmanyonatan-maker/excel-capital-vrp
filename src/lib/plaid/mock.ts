@@ -4,6 +4,7 @@ import type {
   PlaidClient,
   RecipientInput,
   ConsentConstraints,
+  PayerAccount,
   CreateRecipientResult,
   CreateConsentResult,
   CreateLinkTokenResult,
@@ -36,7 +37,12 @@ export class MockPlaidClient implements PlaidClient {
     recipientId: string,
     reference: string,
     constraints: ConsentConstraints,
+    payer?: PayerAccount | null,
   ): Promise<CreateConsentResult> {
+    // Plaid refuses malformed payer numbers outright, so the mock does too.
+    if (payer && (!/^\d{8}$/.test(payer.accountNumber) || !/^\d{6}$/.test(payer.sortCode))) {
+      throw new PlaidApiError("INVALID_FIELD", "invalid payer bacs details", 400, "mock-request");
+    }
     return {
       consentId: `mock-consent-${hash(recipientId + reference)}`,
       rawConstraints: constraints,

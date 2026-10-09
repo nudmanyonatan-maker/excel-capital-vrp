@@ -134,6 +134,11 @@ export default function HelpPage() {
             <li>Search for the company. The name, number and address fill in from Companies House.</li>
             <li>Add the contact email. The setup link goes there.</li>
             <li>
+              Add the borrower&apos;s <strong>business account number and sort code</strong>. Their bank
+              will only let them approve from that account, so a personal account cannot be used. It
+              shows on their page as <strong>Pays from</strong>.
+            </li>
+            <li>
               Choose which account <strong>repayments are paid into</strong>. You can only pick from the list an
               admin has approved. Nobody can type an account number in.
             </li>

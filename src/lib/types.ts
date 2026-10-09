@@ -58,6 +58,12 @@ export interface Borrower {
   /** Registered office from Companies House, formatted for display. */
   registered_address: string | null;
   registered_postcode: string | null;
+  /**
+   * The business's own account, encrypted. Every mandate is locked to it, so
+   * the borrower's bank refuses approval from any other account (migration 0014).
+   */
+  payer_account_number: string | null;
+  payer_sort_code: string | null;
   status: BorrowerStatus;
   deleted_at: string | null;
   created_at: string;
