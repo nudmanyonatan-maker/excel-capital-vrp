@@ -6,6 +6,7 @@ import { useActionState, useState } from "react";
 import {
   addDestinationAction,
   archiveDestinationAction,
+  cancelMandateAction,
   setDefaultDestinationAction,
   type DestinationState,
 } from "@/lib/actions/destinations";
@@ -22,6 +23,8 @@ export interface DestinationRow {
   isArchived: boolean;
   /** Null when ready to collect; otherwise why not, in operator language. */
   blockedReason: string | null;
+  /** The borrower has approved this account's mandate at their bank. */
+  isLive: boolean;
 }
 
 const btn = "rounded-md px-3 py-1.5 text-sm font-medium disabled:opacity-50";
@@ -57,6 +60,11 @@ function RowActions({ borrowerId, row }: { borrowerId: string; row: DestinationR
     null,
   );
   const [confirmArchive, setConfirmArchive] = useState(false);
+  const [cancelState, cancel, cancelling] = useActionState<DestinationState, FormData>(
+    cancelMandateAction,
+    null,
+  );
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   // A legacy mandate with no account row of its own cannot be managed here.
   if (!row.recipientId) return null;
@@ -108,8 +116,48 @@ function RowActions({ borrowerId, row }: { borrowerId: string; row: DestinationR
           )}
         </form>
       )}
+      {row.isLive && row.consentId && (
+        <form action={cancel}>
+          <input type="hidden" name="borrowerId" value={borrowerId} />
+          <input type="hidden" name="consentId" value={row.consentId} />
+          {confirmCancel ? (
+            <span className="inline-flex flex-wrap items-center gap-1">
+              <span className="text-xs text-amber-800">
+                Cancel it with the bank? Nothing more can be collected into this account until the
+                borrower approves again.
+              </span>
+              <button
+                type="submit"
+                disabled={cancelling}
+                className="rounded bg-red-700 px-2 py-0.5 text-xs font-medium text-white hover:bg-red-600 disabled:opacity-50"
+              >
+                {cancelling ? "…" : "Confirm cancel"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmCancel(false)}
+                className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs hover:bg-slate-50"
+              >
+                Keep it
+              </button>
+            </span>
+          ) : (
+            <span className="inline-flex items-center">
+              <button
+                type="button"
+                onClick={() => setConfirmCancel(true)}
+                className="rounded border border-slate-300 bg-white px-2 py-0.5 text-xs text-slate-600 hover:bg-slate-50"
+              >
+                Cancel mandate
+              </button>
+              <InfoTip text={TIPS.cancelMandate} />
+            </span>
+          )}
+        </form>
+      )}
       <Messages state={defState} />
       <Messages state={archState} />
+      <Messages state={cancelState} />
     </div>
   );
 }

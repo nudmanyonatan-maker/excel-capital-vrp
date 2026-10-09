@@ -103,6 +103,8 @@ export interface PlaidClient {
     redirectUri?: string | null;
   }): Promise<CreateLinkTokenResult>;
   getConsent(consentId: string): Promise<GetConsentResult>;
+  /** Cancel a mandate at the bank. No payment can be made against it afterwards. */
+  revokeConsent(consentId: string): Promise<void>;
   executePayment(input: ExecutePaymentInput): Promise<ExecutePaymentResult>;
   getPayment(paymentId: string): Promise<GetPaymentResult>;
   listPayments(consentId: string): Promise<ListedPayment[]>;

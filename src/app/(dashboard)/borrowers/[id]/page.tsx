@@ -176,6 +176,7 @@ export default async function BorrowerProfile({
         isDefault: Boolean(d.recipient?.is_default),
         isArchived: d.recipient?.archived_at != null,
         blockedReason: blockedReason(d),
+        isLive: d.consent?.status === "authorized",
       };
     }),
   );

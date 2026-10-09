@@ -56,6 +56,8 @@ export const TIPS = {
   oneOff:
     "Takes an extra amount outside the schedule, such as a late fee or a missed payment. It must fit within the limits the borrower approved.",
   pause: "Stops every collection for this borrower until you resume. Nothing is taken while paused.",
+  cancelMandate:
+    "Use this to change limits the borrower already approved. It cancels the approval with their bank, then you edit the limits and send a new setup link for them to approve.",
   archive:
     "Hides the borrower from the list but keeps all their records. Only possible once collections are paused and no approval is live.",
 
