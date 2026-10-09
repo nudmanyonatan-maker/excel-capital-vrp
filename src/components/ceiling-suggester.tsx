@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PERIOD_WORDS, suggestCeilings } from "@/lib/ceilings";
 
 /**
  * Offers sensible consent ceilings based on the repayment already typed above.
@@ -44,28 +45,21 @@ export function CeilingSuggester({
       return;
     }
 
-    // 20% headroom, rounded up to the nearest £10.
-    const single = Math.ceil((amount * 1.2) / 10) * 10;
-    const perMonth: Record<string, number> = {
-      daily: 30,
-      weekly: 5,
-      fortnightly: 3,
-      monthly: 2,
-      custom: 5,
-    };
-    const times = perMonth[frequency] ?? 5;
-    const periodic = single * times;
+    const periodField = select("consentPeriod");
+    // Fill a period in if none is chosen, then size the ceiling for THAT period.
+    if (periodField && !periodField.value) periodField.value = "MONTH";
+    const s = suggestCeilings(amount, frequency, periodField?.value || "MONTH");
 
     const singleField = input("maxPaymentAmount");
     const periodicField = input("periodicMaxAmount");
-    const periodField = select("consentPeriod");
-    if (singleField) singleField.value = single.toFixed(2);
-    if (periodicField) periodicField.value = periodic.toFixed(2);
-    if (periodField && !periodField.value) periodField.value = "MONTH";
+    if (singleField) singleField.value = s.single.toFixed(2);
+    if (periodicField) periodicField.value = s.periodic.toFixed(2);
 
+    const word = PERIOD_WORDS[s.period];
     setMessage(
-      `Suggested £${single.toFixed(2)} ceiling per payment, which is the £${amount.toFixed(2)} repayment amount plus 20% to account for potential late fees. ` +
-      `Allowing ${times} ${frequency} collections in a month, the period ceiling should be £${periodic.toFixed(2)} per month.`,
+      `Suggested £${s.single.toFixed(2)} ceiling per payment, which is the £${amount.toFixed(2)} repayment plus 20% for a possible late fee. ` +
+      `Up to ${s.collections - 1} ${frequency} collections can fall in one ${word}, plus room for one extra, so the ceiling is £${s.periodic.toFixed(2)} per ${word}. ` +
+      `If you change the period, press this again.`,
     );
   }
 
