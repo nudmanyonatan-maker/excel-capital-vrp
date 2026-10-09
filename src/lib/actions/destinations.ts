@@ -15,6 +15,8 @@ import { createPendingConsent } from "@/lib/repo/consents";
 import { getActiveSchedule } from "@/lib/repo/schedules";
 import { parseLimits } from "@/lib/borrower-setup-input";
 import { choosePayoutAccount, recipientFieldsFrom } from "@/lib/payout-accounts";
+import { getPlaidClient } from "@/lib/plaid";
+import { cancelMandate } from "@/lib/engine/cancel-mandate";
 
 export interface DestinationValues {
   label: string;
@@ -192,4 +194,34 @@ export async function archiveDestinationAction(
   });
   revalidatePath(`/borrowers/${borrowerId}`);
   return { saved: "Account retired. Its past payments are still shown in the history." };
+}
+
+/**
+ * Cancel an approved mandate so the borrower can approve new terms. Operators
+ * and admins only: it stops collections into that account until the borrower
+ * approves again, so it is a collections decision, not an onboarding one.
+ */
+export async function cancelMandateAction(
+  _prev: DestinationState,
+  fd: FormData,
+): Promise<DestinationState> {
+  const user = await requireRole("operator");
+  const db = getDb();
+  const env = getEnv();
+  const borrowerId = String(fd.get("borrowerId") ?? "");
+  const consentId = String(fd.get("consentId") ?? "");
+  if (!borrowerId || !consentId) return { errors: ["Something went wrong: no mandate was selected."] };
+
+  const result = await cancelMandate(db, getPlaidClient(env), env.APP_ENCRYPTION_KEY, {
+    borrowerId,
+    consentId,
+    actorStaffId: user.id,
+  });
+  if (!result.ok) return { errors: [result.reason] };
+
+  revalidatePath(`/borrowers/${borrowerId}`);
+  return {
+    saved:
+      "Mandate cancelled with the bank. Nothing more can be collected into this account until the borrower approves again. Change the limits under Edit if you need to, then press Generate setup link and send it to them.",
+  };
 }

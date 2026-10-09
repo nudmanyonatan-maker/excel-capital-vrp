@@ -89,33 +89,7 @@ export async function provisionLinkToken(
   let consent = target.consent;
   if (!consent) throw new SetupError("no consent limits configured for borrower");
   if (consent.status === "revoked" || consent.status === "expired") {
-    const replaced = consent;
-    // Carry the end date only if it has not already passed. Copying an elapsed
-    // valid_to produced a replacement mandate that was dead on arrival: the
-    // borrower approved it at their bank and every collection was then skipped
-    // as "consent expired", which is precisely the state re-consent exists to
-    // get them out of. Left open-ended instead, still bounded by the per-payment
-    // and per-period caps, for an operator to set a new term deliberately.
-    const elapsed =
-      replaced.valid_to != null && Date.parse(replaced.valid_to) <= Date.now();
-    consent = await createPendingConsent(db, borrowerId, {
-      recipientId: recipient.id,
-      currency: replaced.currency,
-      maxPaymentAmountMinor: replaced.max_payment_amount_minor,
-      period: replaced.period,
-      periodicMaxAmountMinor: replaced.periodic_max_amount_minor,
-      validFrom: replaced.valid_from,
-      validTo: elapsed ? null : replaced.valid_to,
-    });
-    // Carry the schedule to the replacement mandate.
-    //
-    // A schedule pins the mandate it collects against. Re-consent creates a NEW
-    // mandate row, so a schedule left pointing at the revoked one resolved to a
-    // revoked mandate on every pass and was skipped, for good: the borrower had
-    // re-approved, the money never moved again, and nothing on any screen
-    // explained why. Only the schedule that pointed at the mandate being
-    // replaced, so an operator's explicit choice of a different account stands.
-    await repointSchedulesToReplacementConsent(db, borrowerId, replaced.id, consent.id);
+    consent = await replaceConsent(db, borrowerId, consent, recipient.id);
   } else if (!consent.recipient_id) {
     // Legacy row from before mandates recorded their account. Bind it now, so the
     // destination of anything collected against it is knowable.
@@ -231,6 +205,46 @@ async function safeToReissue(
     console.error("could not check mandate before reissuing it", consent.id, error);
     return false;
   }
+}
+
+/**
+ * A fresh pending mandate carrying the limits of one that can no longer be used,
+ * with the schedule moved onto it. Used when the borrower cancelled at their
+ * bank, when it expired, and when staff cancel it to agree new terms.
+ */
+export async function replaceConsent(
+  db: D1Database,
+  borrowerId: string,
+  replaced: Consent,
+  recipientId: string | null,
+): Promise<Consent> {
+  // Carry the end date only if it has not already passed. Copying an elapsed
+  // valid_to produced a replacement mandate that was dead on arrival: the
+  // borrower approved it at their bank and every collection was then skipped
+  // as "consent expired", which is precisely the state re-consent exists to
+  // get them out of. Left open-ended instead, still bounded by the per-payment
+  // and per-period caps, for an operator to set a new term deliberately.
+  const elapsed =
+    replaced.valid_to != null && Date.parse(replaced.valid_to) <= Date.now();
+  const replacement = await createPendingConsent(db, borrowerId, {
+    recipientId,
+    currency: replaced.currency,
+    maxPaymentAmountMinor: replaced.max_payment_amount_minor,
+    period: replaced.period,
+    periodicMaxAmountMinor: replaced.periodic_max_amount_minor,
+    validFrom: replaced.valid_from,
+    validTo: elapsed ? null : replaced.valid_to,
+  });
+  // Carry the schedule to the replacement mandate.
+  //
+  // A schedule pins the mandate it collects against. Re-consent creates a NEW
+  // mandate row, so a schedule left pointing at the revoked one resolved to a
+  // revoked mandate on every pass and was skipped, for good: the borrower had
+  // re-approved, the money never moved again, and nothing on any screen
+  // explained why. Only the schedule that pointed at the mandate being
+  // replaced, so an operator's explicit choice of a different account stands.
+  await repointSchedulesToReplacementConsent(db, borrowerId, replaced.id, replacement.id);
+  return replacement;
 }
 
 /** Move any active schedule from a superseded mandate onto its replacement. */

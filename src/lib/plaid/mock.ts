@@ -52,8 +52,15 @@ export class MockPlaidClient implements PlaidClient {
     };
   }
 
+  /** Mandates cancelled through this instance, so they read back as cancelled. */
+  private readonly revoked = new Set<string>();
+
   async getConsent(consentId: string): Promise<GetConsentResult> {
-    return { consentId, status: "AUTHORISED" };
+    return { consentId, status: this.revoked.has(consentId) ? "REVOKED" : "AUTHORISED" };
+  }
+
+  async revokeConsent(consentId: string): Promise<void> {
+    this.revoked.add(consentId);
   }
 
   /**

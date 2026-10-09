@@ -190,6 +190,10 @@ export class RealPlaidClient implements PlaidClient {
     return { consentId, status: readRequiredString(r, "status") };
   }
 
+  async revokeConsent(consentId: string): Promise<void> {
+    await this.call("/payment_initiation/consent/revoke", { consent_id: consentId });
+  }
+
   async executePayment(input: ExecutePaymentInput): Promise<ExecutePaymentResult> {
     const r = await this.call("/payment_initiation/consent/payment/execute", {
         consent_id: input.consentId,

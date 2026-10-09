@@ -37,6 +37,7 @@ const EXPECTED: Record<string, Role | "public"> = {
   addDestinationAction: "operator",
   setDefaultDestinationAction: "operator",
   archiveDestinationAction: "operator",
+  cancelMandateAction: "operator",
   executePaymentNowAction: "operator",
   retryPaymentAction: "operator",
 

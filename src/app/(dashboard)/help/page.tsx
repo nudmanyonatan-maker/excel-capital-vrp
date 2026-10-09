@@ -212,6 +212,27 @@ export default function HelpPage() {
               <strong>Archive borrower</strong>: {TIPS.archive}
             </li>
           </ul>
+          <h3 id="new-limits" className="pt-2 font-semibold text-slate-900">
+            Changing limits a borrower already approved
+          </h3>
+          <p>
+            A bank never lets approved limits be edited, so you cancel the approval and they approve
+            new ones:
+          </p>
+          <Steps>
+            <li>
+              On the borrower, under <strong>Where repayments are sent</strong>, press{" "}
+              <strong>Cancel mandate</strong> and confirm.
+            </li>
+            <li>
+              Press <strong>Edit</strong> on the Business card and change the limits, for example the
+              period from Month to Year.
+            </li>
+            <li>
+              Press <strong>Generate setup link</strong> and send it. Collections start again once they
+              approve.
+            </li>
+          </Steps>
           <Shot src="/help/borrower-page.png" alt="A borrower page as an operator sees it" width={1265} height={1102} />
         </Section>
 
