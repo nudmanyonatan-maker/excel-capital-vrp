@@ -125,6 +125,17 @@ export async function provisionLinkToken(
     }
   } else {
     const reference = referenceFor(borrower.legal_name);
+    // Locked to the business's own account when we have it, so the bank refuses
+    // approval from any other account. Borrowers onboarded before this have none
+    // and get an unlocked mandate, exactly as before.
+    const [payerAccount, payerSort] = await Promise.all([
+      unprotectString(borrower.payer_account_number, encryptionKey),
+      unprotectString(borrower.payer_sort_code, encryptionKey),
+    ]);
+    const payer =
+      payerAccount && payerSort
+        ? { name: borrower.legal_name, accountNumber: payerAccount, sortCode: payerSort }
+        : null;
     const c = await plaid.createConsent(plaidRecipientId, reference, {
       currency: consent.currency,
       maxPaymentAmountMinor: consent.max_payment_amount_minor,
@@ -133,7 +144,7 @@ export async function provisionLinkToken(
       periodicMaxAmountMinor: consent.periodic_max_amount_minor,
       validFrom: consent.valid_from,
       validTo: consent.valid_to,
-    });
+    }, payer);
     plaintextConsentId = c.consentId;
     // Two overlapping loads of the setup page can each create a consent at Plaid
     // before either records one, and the loser used to overwrite the winner:

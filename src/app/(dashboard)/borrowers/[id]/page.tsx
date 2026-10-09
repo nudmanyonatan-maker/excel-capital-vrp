@@ -8,7 +8,7 @@ import { getActiveSchedule, isStoredDaily, parseDaysOfWeek } from "@/lib/repo/sc
 import { listPaymentsForBorrower, collectionProgress } from "@/lib/repo/payments";
 import { latestSetupLinkForBorrower } from "@/lib/repo/setup-links";
 import { getCurrentUser, hasRole } from "@/lib/auth";
-import { maskAccount, maskSortCode, payoutChoicesFor } from "@/lib/payout-accounts";
+import { describePayerAccount, maskAccount, maskSortCode, payoutChoicesFor } from "@/lib/payout-accounts";
 import { InfoTip } from "@/components/info-tip";
 import { TIPS } from "@/lib/help-text";
 import { setBorrowerStatusFormAction } from "@/lib/actions/borrowers";
@@ -180,6 +180,8 @@ export default async function BorrowerProfile({
       };
     }),
   );
+
+  const payerMasked = await describePayerAccount(borrower, env.APP_ENCRYPTION_KEY);
 
   const payoutChoices = canOperate && user
     ? await payoutChoicesFor(db, user, env.APP_ENCRYPTION_KEY)
@@ -395,6 +397,16 @@ export default async function BorrowerProfile({
           <Row
             label="Registered office"
             value={borrower.registered_address}
+          />
+          <Row
+            label="Pays from"
+            value={
+              payerMasked ? (
+                <span title="Their bank only lets them approve from this account">{payerMasked} (locked)</span>
+              ) : (
+                <span className="text-amber-700">Any account: not locked to the business yet</span>
+              )
+            }
           />
         </Card>
 

@@ -15,6 +15,10 @@ export const TIPS = {
     "The setup link is emailed here. Use the person who can approve payments at the company's bank.",
   contactPhone: "Optional. For your own records.",
 
+  // Where the money comes from
+  payerAccount:
+    "The borrower's own business bank account. Their bank will only let them approve from this exact account, so they cannot connect a personal account instead.",
+
   // Where the money goes
   payoutAccount:
     "Which of our bank accounts the borrower's repayments are paid into. Only an admin can add accounts to this list, so nobody can type in their own.",

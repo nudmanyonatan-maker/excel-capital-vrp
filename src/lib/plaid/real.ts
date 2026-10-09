@@ -4,6 +4,7 @@ import type {
   PlaidClient,
   RecipientInput,
   ConsentConstraints,
+  PayerAccount,
   CreateRecipientResult,
   CreateConsentResult,
   CreateLinkTokenResult,
@@ -105,6 +106,7 @@ export class RealPlaidClient implements PlaidClient {
     recipientId: string,
     reference: string,
     constraints: ConsentConstraints,
+    payer?: PayerAccount | null,
   ): Promise<CreateConsentResult> {
     // Plaid requires BOTH caps on a VRP consent. Fail here with a message that
     // names the missing limit, rather than letting Plaid return a generic 400.
@@ -150,12 +152,22 @@ export class RealPlaidClient implements PlaidClient {
       };
     }
 
-    const r = await this.call("/payment_initiation/consent/create", {
-        recipient_id: recipientId,
-        reference,
-        type: this.cfg.consentType ?? "COMMERCIAL",
-        constraints: plaidConstraints,
-      });
+    const body: Record<string, unknown> = {
+      recipient_id: recipientId,
+      reference,
+      type: this.cfg.consentType ?? "COMMERCIAL",
+      constraints: plaidConstraints,
+    };
+    // Locks the mandate to this one account: the borrower's bank refuses
+    // approval from any other, so a director's personal account cannot be used
+    // in place of the business's. Plaid requires both the name and the numbers.
+    if (payer) {
+      body.payer_details = {
+        name: payer.name,
+        numbers: { bacs: { account: payer.accountNumber, sort_code: payer.sortCode } },
+      };
+    }
+    const r = await this.call("/payment_initiation/consent/create", body);
     return { consentId: readRequiredString(r, "consent_id"), rawConstraints: plaidConstraints };
   }
 

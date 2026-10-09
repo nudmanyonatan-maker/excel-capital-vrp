@@ -177,10 +177,20 @@ describe("pages that decrypt bank details", () => {
     // Where money goes is chosen from the approved list. If any other action
     // encrypts an account number from a form, someone has reintroduced a way
     // for whoever onboards a borrower to send its repayments to themselves.
-    const writers = actionFiles().filter((file) =>
-      /(?<!un)protectString\(/.test(readFileSync(path.join(ACTIONS_DIR, file), "utf8")),
-    );
-    expect(writers).toEqual(["payout-accounts.ts"]);
+    //
+    // The one exception is the borrower's OWN business account, where money
+    // comes FROM: every mandate is locked to it, so it can only narrow where a
+    // borrower can pay from, never redirect where money goes. Those calls must
+    // name it as the payer.
+    const writers: string[] = [];
+    for (const file of actionFiles()) {
+      const source = readFileSync(path.join(ACTIONS_DIR, file), "utf8");
+      const calls = source.split("\n").filter((line) => /(?<!un)protectString\(/.test(line));
+      if (file === "payout-accounts.ts") continue;
+      const notPayer = calls.filter((line) => !/payer/.test(line));
+      if (notPayer.length > 0) writers.push(`${file}: ${notPayer.join(" | ").trim()}`);
+    }
+    expect(writers).toEqual([]);
   });
 
   it("no borrower form reads a typed account number any more", () => {

@@ -105,6 +105,19 @@ export async function describeStoredAccount(
   return masked ? `${account.name} (${masked})` : account.name;
 }
 
+/** "••••4321 / ••-••-56" for the business account mandates are locked to, or null. */
+export async function describePayerAccount(
+  borrower: { payer_account_number: string | null; payer_sort_code: string | null },
+  encryptionKey: string,
+): Promise<string | null> {
+  const [acct, sort] = await Promise.all([
+    unprotectString(borrower.payer_account_number, encryptionKey),
+    unprotectString(borrower.payer_sort_code, encryptionKey),
+  ]);
+  if (!acct || !sort) return null;
+  return [maskAccount(acct), maskSortCode(sort)].join(" / ");
+}
+
 /** The fields a borrower's own account row copies from an approved account. */
 export function recipientFieldsFrom(account: PayoutAccount): {
   name: string;

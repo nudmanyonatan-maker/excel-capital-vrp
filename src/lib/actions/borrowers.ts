@@ -12,6 +12,7 @@ import {
 import {
   createBorrower,
   findBorrowerByCompanyNumber,
+  setBorrowerPayerAccount,
   setBorrowerStatus,
   updateBorrower,
 } from "@/lib/repo/borrowers";
@@ -22,6 +23,8 @@ import { createPendingConsent } from "@/lib/repo/consents";
 import { toMinorUnits } from "@/lib/money";
 import type { BorrowerStatus, EndMode, Frequency } from "@/lib/types";
 import { choosePayoutAccount, recipientFieldsFrom } from "@/lib/payout-accounts";
+import { parsePayerAccount } from "@/lib/borrower-setup-input";
+import { protectString } from "@/lib/crypto";
 
 function str(fd: FormData, key: string): string | null {
   const v = fd.get(key);
@@ -66,6 +69,11 @@ export async function createBorrowerAction(fd: FormData): Promise<void> {
   // borrower's repayments collected into an account of their own.
   const payout = await choosePayoutAccount(db, user, str(fd, "payoutAccountId"));
   if (!payout.ok) throw new Error(payout.reason);
+
+  // The business's own account, which every mandate is locked to so the bank
+  // refuses approval from any other (a director's personal account, say).
+  const payer = parsePayerAccount(str(fd, "payerAccount"), str(fd, "payerSort"));
+  if (!payer.value) throw new Error(payer.errors.join(" "));
 
   // Verify the company against Companies House and use the official name, so a
   // borrower record can never disagree with the register. Enforcement is a
@@ -144,6 +152,10 @@ export async function createBorrowerAction(fd: FormData): Promise<void> {
     createdBy: user.id,
   });
 
+  await setBorrowerPayerAccount(db, borrower.id, {
+    accountNumber: (await protectString(payer.value.accountNumber, env.APP_ENCRYPTION_KEY))!,
+    sortCode: (await protectString(payer.value.sortCode, env.APP_ENCRYPTION_KEY))!,
+  });
   const recipientId = (await upsertRecipient(db, borrower.id, recipientFieldsFrom(payout.account))).id;
 
   const amountMinor = money(fd, "amount");

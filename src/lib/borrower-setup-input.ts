@@ -156,3 +156,24 @@ export function parseBankAndLimits(raw: BankAndLimitsRaw): ParseResult {
   if (errors.length > 0) return { errors };
   return { errors: [], value: { ...account.value!, ...limits.value! } };
 }
+
+/**
+ * The borrower's own business account number and sort code, the only account
+ * their mandate can be approved from. Bare digits come back, as Plaid requires.
+ */
+export function parsePayerAccount(
+  accountNumber: string | null | undefined,
+  sortCode: string | null | undefined,
+): { errors: string[]; value?: { accountNumber: string; sortCode: string } } {
+  const errors: string[] = [];
+  const account = (accountNumber ?? "").replace(/\D/g, "");
+  const sort = (sortCode ?? "").replace(/\D/g, "");
+  if (!/^\d{8}$/.test(account)) {
+    errors.push("The business's account number must be 8 digits.");
+  }
+  if (!/^\d{6}$/.test(sort)) {
+    errors.push("The business's sort code must be 6 digits, for example 12-34-56.");
+  }
+  if (errors.length > 0) return { errors };
+  return { errors: [], value: { accountNumber: account, sortCode: sort } };
+}

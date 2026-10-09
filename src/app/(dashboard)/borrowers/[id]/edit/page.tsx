@@ -8,7 +8,7 @@ import { getEnv } from "@/lib/db";
 import { updateBorrowerDetailsFormAction } from "@/lib/actions/borrowers";
 import { ActionForm } from "@/components/action-form";
 import { BankLimitsForm } from "@/components/bank-limits-form";
-import { describeStoredAccount, payoutChoicesFor } from "@/lib/payout-accounts";
+import { describeStoredAccount, describePayerAccount, payoutChoicesFor } from "@/lib/payout-accounts";
 
 export const dynamic = "force-dynamic";
 
@@ -148,7 +148,10 @@ export default async function EditBorrowerPage({
         locked={consent?.status === "authorized"}
         choices={payoutChoices}
         current={current}
+        payerMasked={await describePayerAccount(borrower, env.APP_ENCRYPTION_KEY)}
         defaults={{
+          payerAccount: "",
+          payerSort: "",
           payoutAccountId: recipient?.payout_account_id ?? "",
           maxPaymentAmount: major(consent?.max_payment_amount_minor),
           periodicMaxAmount: major(consent?.periodic_max_amount_minor),

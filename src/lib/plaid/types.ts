@@ -30,6 +30,13 @@ export interface ConsentConstraints {
   validTo?: string | null; // ISO datetime
 }
 
+/** The only account a mandate may be approved from. Plaintext digits. */
+export interface PayerAccount {
+  name: string;
+  accountNumber: string;
+  sortCode: string;
+}
+
 export interface CreateRecipientResult {
   recipientId: string;
 }
@@ -95,6 +102,7 @@ export interface PlaidClient {
     recipientId: string,
     reference: string,
     constraints: ConsentConstraints,
+    payer?: PayerAccount | null,
   ): Promise<CreateConsentResult>;
   createLinkToken(params: {
     consentId: string;

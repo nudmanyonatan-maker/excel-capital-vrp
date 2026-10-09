@@ -299,3 +299,31 @@ export async function syncBorrowerStatusToMandates(
   }
 }
 
+/**
+ * Lock this borrower's future mandates to their business account. Details must
+ * already be encrypted.
+ *
+ * A mandate already sent to Plaid but not yet approved was created without this
+ * lock (or with an old one), and Plaid fixes it at creation, so those are
+ * detached: the next setup link mints one with the right account. Approved
+ * mandates are never touched; they are the borrower's agreement with their bank.
+ */
+export async function setBorrowerPayerAccount(
+  db: D1Database,
+  borrowerId: string,
+  account: { accountNumber: string; sortCode: string },
+): Promise<{ detachedPending: number }> {
+  await db
+    .prepare("UPDATE borrowers SET payer_account_number = ?, payer_sort_code = ? WHERE id = ?")
+    .bind(account.accountNumber, account.sortCode, borrowerId)
+    .run();
+  const detached = await db
+    .prepare(
+      `UPDATE consents
+          SET plaid_consent_id = NULL, plaid_consent_id_hash = NULL, raw_constraints = NULL
+        WHERE borrower_id = ? AND status = 'pending' AND plaid_consent_id IS NOT NULL`,
+    )
+    .bind(borrowerId)
+    .run();
+  return { detachedPending: detached.meta.changes ?? 0 };
+}
