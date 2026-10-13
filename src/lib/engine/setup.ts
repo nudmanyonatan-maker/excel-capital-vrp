@@ -7,6 +7,7 @@ import {
   attachPlaidConsent,
   createPendingConsent,
   getConsent,
+  detachPendingConsent,
   realignPendingConsent,
   setConsentPlaidHash,
   setConsentRecipient,
@@ -116,6 +117,28 @@ export async function provisionLinkToken(
     consent = (await getConsent(db, consent.id)) ?? consent;
   }
 
+  // 2c. A mandate sent to the bank with a start date that had already passed.
+  // Medway Licensed Taxis was refused by NatWest and Lloyds with
+  // PAYMENT_INVALID_SCHEDULE: its start date was a day before the borrower
+  // opened the link. Re-sent without the start date, which in the past means
+  // nothing anyway. Only when Plaid confirms it was never approved.
+  if (
+    consent.plaid_consent_id &&
+    sentWithPastStart(consent) &&
+    (await safeToReissue(plaid, encryptionKey, consent))
+  ) {
+    if (await detachPendingConsent(db, consent.id, consent.plaid_consent_id_hash)) {
+      await writeAudit(db, {
+        actorStaffId: null,
+        action: "consent.reissued",
+        entityType: "borrower",
+        entityId: borrowerId,
+        metadata: { consentId: consent.id, reason: "start_date_in_past" },
+      });
+    }
+    consent = (await getConsent(db, consent.id)) ?? consent;
+  }
+
   // 3. Plaid consent
   let plaintextConsentId: string;
   if (consent.plaid_consent_id) {
@@ -142,7 +165,7 @@ export async function provisionLinkToken(
       period: consent.period,
       periodicAlignment: consent.periodic_alignment,
       periodicMaxAmountMinor: consent.periodic_max_amount_minor,
-      validFrom: consent.valid_from,
+      validFrom: startDateForBank(consent.valid_from),
       validTo: consent.valid_to,
     }, payer);
     plaintextConsentId = c.consentId;
@@ -256,6 +279,28 @@ export async function replaceConsent(
   // replaced, so an operator's explicit choice of a different account stands.
   await repointSchedulesToReplacementConsent(db, borrowerId, replaced.id, replacement.id);
   return replacement;
+}
+
+/**
+ * The start date to send the bank: only one still in the future. A start that
+ * has passed restricts nothing, and banks refuse it (PAYMENT_INVALID_SCHEDULE).
+ */
+function startDateForBank(validFrom: string | null): string | null {
+  if (!validFrom) return null;
+  const at = Date.parse(validFrom);
+  return Number.isFinite(at) && at > Date.now() ? validFrom : null;
+}
+
+/** Whether the mandate Plaid holds was created with a start date now in the past. */
+function sentWithPastStart(consent: Consent): boolean {
+  if (!consent.raw_constraints) return false;
+  try {
+    const raw = JSON.parse(consent.raw_constraints) as { valid_date_time?: { from?: string } };
+    const from = raw.valid_date_time?.from;
+    return Boolean(from) && Date.parse(from!) <= Date.now();
+  } catch {
+    return false;
+  }
 }
 
 /** Move any active schedule from a superseded mandate onto its replacement. */
