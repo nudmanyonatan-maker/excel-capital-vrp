@@ -412,6 +412,30 @@ export async function realignPendingConsent(db: D1Database, id: string): Promise
 }
 
 /**
+ * Drop the Plaid consent a pending mandate was sent with, so the next
+ * provisioning sends a corrected one. Guarded on the exact Plaid consent being
+ * replaced, so of two overlapping page loads only the first detaches and the
+ * second leaves the replacement alone. Only call once Plaid has confirmed the
+ * old one was never approved. Returns whether this call changed the row.
+ */
+export async function detachPendingConsent(
+  db: D1Database,
+  id: string,
+  plaidConsentIdHash: string | null,
+): Promise<boolean> {
+  const result = await db
+    .prepare(
+      `UPDATE consents
+          SET plaid_consent_id = NULL, plaid_consent_id_hash = NULL, raw_constraints = NULL
+        WHERE id = ? AND status = 'pending' AND plaid_consent_id IS NOT NULL
+          AND plaid_consent_id_hash IS ?`,
+    )
+    .bind(id, plaidConsentIdHash)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/**
  * Unapproved mandates that Plaid has actually been told about, oldest first.
  *
  * The counterpart to authorisedConsents, and it exists for the same reason: a
