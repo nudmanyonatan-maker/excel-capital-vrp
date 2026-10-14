@@ -22,7 +22,7 @@ interface PlaidError {
  * are the two things nobody can reconstruct afterwards: a screenshot of an error
  * box shows neither, and Plaid support ask for the session id first.
  */
-interface PlaidMetadata {
+export interface PlaidMetadata {
   institution?: { name?: string; institution_id?: string } | null;
   link_session_id?: string;
   request_id?: string;
@@ -34,7 +34,7 @@ declare global {
     Plaid?: {
       create(config: {
         token: string;
-        onSuccess: () => void;
+        onSuccess: (publicToken: string, metadata?: PlaidMetadata) => void;
         onExit?: (err: PlaidError | null, metadata?: PlaidMetadata) => void;
         onEvent?: (eventName: string, metadata?: unknown) => void;
         receivedRedirectUri?: string;
@@ -84,6 +84,29 @@ export function reportSetupError(
   }
 }
 
+/**
+ * Put the bank the borrower approved with on the completion form.
+ *
+ * Successful approvals used to record nothing about the bank, so "did this go
+ * through at NatWest?" could only be answered for failures. Plaid hands it to
+ * onSuccess; the server writes it into the consent.authorized audit row.
+ */
+export function stampInstitution(form: HTMLFormElement, metadata?: PlaidMetadata): void {
+  const set = (name: string, value: string | undefined) => {
+    if (!value) return;
+    let input = form.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+    if (!input) {
+      input = document.createElement("input");
+      input.type = "hidden";
+      input.name = name;
+      form.appendChild(input);
+    }
+    input.value = value;
+  };
+  set("institutionName", metadata?.institution?.name);
+  set("institutionId", metadata?.institution?.institution_id);
+}
+
 /** Shared with the /setup/complete page, which resumes the flow after a bank redirect. */
 export const SETUP_RESUME_KEY = "excel-capital-setup-resume";
 
@@ -130,7 +153,7 @@ export function SetupLauncher({
    * what went wrong and leaves the button usable for another try.
    */
   const openPlaid = useCallback(
-    (submit: () => void) => {
+    (submit: (metadata?: PlaidMetadata) => void) => {
       setProblem(null);
       setLaunching(true);
 
@@ -172,7 +195,7 @@ export function SetupLauncher({
         try {
           const handler = window.Plaid.create({
             token: linkToken,
-            onSuccess: () => submit(),
+            onSuccess: (_publicToken, metadata) => submit(metadata),
             onExit: (err, metadata) => {
               setLaunching(false);
               if (!err) return; // The borrower simply closed it; not a failure.
@@ -269,7 +292,10 @@ export function SetupLauncher({
           disabled={pending || launching}
           onClick={(e) => {
             const form = e.currentTarget.closest("form") as HTMLFormElement;
-            openPlaid(() => form.requestSubmit());
+            openPlaid((metadata) => {
+              stampInstitution(form, metadata);
+              form.requestSubmit();
+            });
           }}
           className="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
         >

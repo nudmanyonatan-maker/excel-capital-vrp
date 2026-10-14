@@ -128,7 +128,7 @@ export default async function BorrowerProfile({
   const borrower = await getBorrower(db, id);
   if (!borrower) notFound();
 
-  const [consent, schedule, payments, user, latestLink, destinations, lastSetupFailure] =
+  const [consent, schedule, payments, user, latestLink, destinations, lastSetupFailure, lastApproval] =
     await Promise.all([
       getActiveConsent(db, id),
       getActiveSchedule(db, id),
@@ -137,6 +137,7 @@ export default async function BorrowerProfile({
       latestSetupLinkForBorrower(db, id),
       listDestinations(db, id),
       latestAuditEntry(db, SETUP_FAILED_ACTION, "borrower", id),
+      latestAuditEntry(db, "consent.authorized", "borrower", id),
     ]);
   const progress = loanProgress({
     schedule,
@@ -159,6 +160,16 @@ export default async function BorrowerProfile({
   // Kept as the provider's own words rather than a paraphrase, because the point
   // of showing it is to stop anyone theorising about a screenshot.
   const failure = parseSetupFailure(lastSetupFailure);
+  // The bank they last approved with. Only recorded from 14 Oct 2026 on, and
+  // not when an approval is found by a background check instead of the page.
+  const approvedWith = (() => {
+    try {
+      const md = lastApproval?.metadata ? (JSON.parse(lastApproval.metadata) as { institutionName?: string }) : null;
+      return md?.institutionName ?? null;
+    } catch {
+      return null;
+    }
+  })();
   const env = getEnv();
   // Decrypt and mask every destination here, on the server. The panel and the
   // picker are client components, so they must never receive account numbers.
@@ -447,6 +458,9 @@ export default async function BorrowerProfile({
               : null}
           />
           <Row label="Valid to" value={consent?.valid_to} />
+          {consent?.status === "authorized" && approvedWith && (
+            <Row label="Approved with" value={approvedWith} />
+          )}
         </Card>
 
         <Card
