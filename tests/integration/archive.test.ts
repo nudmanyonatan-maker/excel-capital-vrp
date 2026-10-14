@@ -64,7 +64,29 @@ describe("archiveBlockers: archiving must not hide live money", () => {
    * nightly sweep works from schedules. Archiving someone with a live mandate and
    * an active schedule would keep taking their money with nobody watching.
    */
-  it("reports nothing for a borrower who was never set up", async () => {
+  it("lets a paused borrower be archived even with a schedule and a live mandate", async () => {
+    // Falconwood Recruitment: paused, with an active schedule, and archiving
+    // was refused with "Use Pause collections first", which they already had.
+    const b = await borrower();
+    await upsertSchedule(env.DB, b.id, {
+      amountMinor: 50_000,
+      frequency: "weekly",
+      startDate: "2026-09-01",
+      endMode: "count",
+      endCount: 4,
+    });
+    const consent = await createPendingConsent(env.DB, b.id, {
+      maxPaymentAmountMinor: 100,
+      periodicMaxAmountMinor: 100,
+      period: "MONTH",
+    });
+    await setConsentStatus(env.DB, consent.id, "authorized");
+    await env.DB.prepare("UPDATE borrowers SET status = 'paused' WHERE id = ?").bind(b.id).run();
+
+    expect(await archiveBlockers(env.DB, b.id)).toEqual({ activeSchedule: false, liveMandate: false });
+  });
+
+    it("reports nothing for a borrower who was never set up", async () => {
     const b = await borrower();
     expect(await archiveBlockers(env.DB, b.id)).toEqual({
       activeSchedule: false,

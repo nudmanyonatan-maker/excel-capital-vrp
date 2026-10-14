@@ -198,6 +198,14 @@ export async function archiveBlockers(
   db: D1Database,
   id: string,
 ): Promise<{ activeSchedule: boolean; liveMandate: boolean }> {
+  // A paused borrower is not being collected from, so archiving hides nothing
+  // live. The refusal below told staff to "Use Pause collections first" even
+  // after they had, which made archiving impossible for exactly the borrowers
+  // it is for. Once archived they stay safe: collection skips archived
+  // borrowers, and their page cannot be opened to resume them until restored.
+  const borrower = await getBorrowerIncludingArchived(db, id);
+  if (borrower?.status === "paused") return { activeSchedule: false, liveMandate: false };
+
   const row = await db
     .prepare(
       `SELECT
