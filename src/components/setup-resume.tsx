@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { completeSetupAction, type CompleteState } from "@/lib/actions/setup-complete";
-import { SETUP_RESUME_KEY, reportSetupError } from "@/components/setup-launcher";
+import { SETUP_RESUME_KEY, reportSetupError, stampInstitution } from "@/components/setup-launcher";
 
 const PLAID_SCRIPT = "https://cdn.plaid.com/link/v2/stable/link-initialize.js";
 
@@ -86,8 +86,9 @@ export function SetupResume() {
       const handler = window.Plaid?.create({
         token: stored!.linkToken!,
         receivedRedirectUri: window.location.href,
-        onSuccess: () => {
+        onSuccess: (_publicToken, metadata) => {
           // Nothing to clean up: the stored handoff was consumed on read.
+          if (formRef.current) stampInstitution(formRef.current, metadata);
           formRef.current?.requestSubmit();
         },
         onExit: (err, metadata) => {

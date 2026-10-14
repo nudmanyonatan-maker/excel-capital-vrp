@@ -59,6 +59,14 @@ export async function completeSetupAction(
 
   const plaid = getPlaidClient(env);
   const nowIso = new Date().toISOString();
+  // Which bank they approved with, as Plaid reported it to the browser. Bounded
+  // and only ever written to the audit trail, since the caller is untrusted.
+  const bank = (key: string, max: number) => {
+    const v = fd.get(key);
+    return typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null;
+  };
+  const institutionName = bank("institutionName", 120);
+  const institutionId = bank("institutionId", 100);
   const authorised = new Set<string>();
 
   for (const consent of toConfirm) {
@@ -82,6 +90,8 @@ export async function completeSetupAction(
         // Worth finding in the audit trail later: a live mandate on an account
         // that was retired mid-approval.
         recipientArchived: !outstanding.some((o) => o.id === consent.id),
+        institutionName,
+        institutionId,
       },
     });
     authorised.add(consent.id);
