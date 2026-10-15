@@ -225,7 +225,12 @@ export async function upsertSchedule(
   return created;
 }
 
-function validateSchedule(input: ScheduleInput): void {
+/**
+ * Refuse a schedule that cannot run. Exported so creating a borrower can check
+ * it BEFORE writing anything: checked only here, at the write, it threw after
+ * the borrower and its accounts were already saved, leaving them half made.
+ */
+export function validateSchedule(input: ScheduleInput): void {
   if (!Number.isSafeInteger(input.amountMinor) || input.amountMinor <= 0) {
     throw new Error("schedule amount must be a positive integer in minor units");
   }
@@ -243,16 +248,16 @@ function validateSchedule(input: ScheduleInput): void {
   }
   if (input.endMode === "date") {
     if (!input.endDate || !isDate(input.endDate) || input.endDate < input.startDate) {
-      throw new Error("schedule end date must be on or after the start date");
+      throw new Error("The schedule's end date must be on or after its start date.");
     }
   }
   if (input.endMode === "count" &&
       (!Number.isInteger(input.endCount) || input.endCount! < 1 || input.endCount! > 10000)) {
-    throw new Error("schedule payment count must be between 1 and 10000");
+    throw new Error("Enter the number of payments the schedule ends after (End: number of payments), or choose a different end mode.");
   }
   if (input.endMode === "total" &&
       (!Number.isSafeInteger(input.endTotalMinor) || input.endTotalMinor! <= 0)) {
-    throw new Error("schedule total must be a positive amount");
+    throw new Error("Enter the total that ends the schedule (End: total), or choose a different end mode.");
   }
 }
 

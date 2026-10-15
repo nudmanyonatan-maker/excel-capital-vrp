@@ -17,9 +17,9 @@ import {
   updateBorrower,
 } from "@/lib/repo/borrowers";
 import { upsertRecipient } from "@/lib/repo/recipients";
-import { upsertSchedule } from "@/lib/repo/schedules";
+import { upsertSchedule, validateSchedule, type ScheduleInput } from "@/lib/repo/schedules";
 import { consentBelongsToBorrower } from "@/lib/repo/destinations";
-import { createPendingConsent } from "@/lib/repo/consents";
+import { createPendingConsent, validateConsentLimits } from "@/lib/repo/consents";
 import { toMinorUnits } from "@/lib/money";
 import type { BorrowerStatus, EndMode, Frequency } from "@/lib/types";
 import { choosePayoutAccount, recipientFieldsFrom } from "@/lib/payout-accounts";
@@ -74,6 +74,39 @@ export async function createBorrowerAction(fd: FormData): Promise<void> {
   // refuses approval from any other (a director's personal account, say).
   const payer = parsePayerAccount(str(fd, "payerAccount"), str(fd, "payerSort"));
   if (!payer.value) throw new Error(payer.errors.join(" "));
+
+  // Check the schedule and the limits before anything is written. They used to
+  // be checked by the writes themselves, AFTER the borrower, its business
+  // account and its payout account were saved, so a refused schedule left a
+  // borrower with no limits. Pressing Create again then hit "already onboarded",
+  // and the limits had to be typed in again on the Edit page. 15 of the first 27
+  // production borrowers were made that way.
+  const amountMinor = money(fd, "amount");
+  const frequency = str(fd, "frequency") as Frequency | null;
+  const startDate = str(fd, "startDate");
+  const schedule: ScheduleInput | null =
+    amountMinor && frequency && startDate && hasRole(user, "operator")
+      ? {
+          amountMinor,
+          frequency,
+          intervalDays: num(fd, "intervalDays"),
+          daysOfWeek: days(fd),
+          startDate,
+          endMode: (str(fd, "endMode") as EndMode | null) ?? "count",
+          endDate: str(fd, "endDate"),
+          endCount: num(fd, "endCount"),
+          endTotalMinor: money(fd, "endTotal"),
+        }
+      : null;
+  if (schedule) validateSchedule(schedule);
+  const limits = {
+    maxPaymentAmountMinor: money(fd, "maxPaymentAmount"),
+    period: str(fd, "consentPeriod"),
+    periodicMaxAmountMinor: money(fd, "periodicMaxAmount"),
+    validFrom: str(fd, "consentValidFrom"),
+    validTo: str(fd, "consentValidTo"),
+  };
+  validateConsentLimits(limits);
 
   // Verify the company against Companies House and use the official name, so a
   // borrower record can never disagree with the register. Enforcement is a
@@ -158,23 +191,7 @@ export async function createBorrowerAction(fd: FormData): Promise<void> {
   });
   const recipientId = (await upsertRecipient(db, borrower.id, recipientFieldsFrom(payout.account))).id;
 
-  const amountMinor = money(fd, "amount");
-  const frequency = str(fd, "frequency") as Frequency | null;
-  const startDate = str(fd, "startDate");
-  const endMode = (str(fd, "endMode") as EndMode | null) ?? "count";
-  if (amountMinor && frequency && startDate && hasRole(user, "operator")) {
-    await upsertSchedule(db, borrower.id, {
-      amountMinor,
-      frequency,
-      intervalDays: num(fd, "intervalDays"),
-      daysOfWeek: days(fd),
-      startDate,
-      endMode,
-      endDate: str(fd, "endDate"),
-      endCount: num(fd, "endCount"),
-      endTotalMinor: money(fd, "endTotal"),
-    });
-  }
+  if (schedule) await upsertSchedule(db, borrower.id, schedule);
 
   // Intended VRP consent limits (used when the Plaid consent is created at setup).
   await createPendingConsent(db, borrower.id, {
@@ -182,11 +199,7 @@ export async function createBorrowerAction(fd: FormData): Promise<void> {
     // recorded from the very first row rather than inferred later.
     recipientId,
     currency: "GBP",
-    maxPaymentAmountMinor: money(fd, "maxPaymentAmount"),
-    period: str(fd, "consentPeriod"),
-    periodicMaxAmountMinor: money(fd, "periodicMaxAmount"),
-    validFrom: str(fd, "consentValidFrom"),
-    validTo: str(fd, "consentValidTo"),
+    ...limits,
   });
 
   await writeAudit(db, {

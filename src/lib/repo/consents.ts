@@ -139,6 +139,27 @@ export interface ConsentLimits {
 }
 
 /**
+ * Refuse limits no bank would accept. Exported so creating a borrower can check
+ * them before writing anything, rather than after the borrower already exists.
+ */
+export function validateConsentLimits(limits: ConsentLimits): void {
+  for (const amount of [limits.maxPaymentAmountMinor, limits.periodicMaxAmountMinor]) {
+    if (amount != null && (!Number.isSafeInteger(amount) || amount <= 0)) {
+      throw new Error("The payment ceilings must be more than £0.");
+    }
+  }
+  if (limits.validFrom && Number.isNaN(Date.parse(limits.validFrom))) {
+    throw new Error("The mandate's Valid from date is not a real date.");
+  }
+  if (limits.validTo && Number.isNaN(Date.parse(limits.validTo))) {
+    throw new Error("The mandate's Valid to date is not a real date.");
+  }
+  if (limits.validFrom && limits.validTo && Date.parse(limits.validTo) <= Date.parse(limits.validFrom)) {
+    throw new Error("The mandate's Valid to date must be after its Valid from date.");
+  }
+}
+
+/**
  * Create a pending consent capturing the intended limits (before Plaid auth).
  *
  * Alignment is not a choice the caller gets: it is always CONSENT, because that
@@ -149,20 +170,7 @@ export async function createPendingConsent(
   borrowerId: string,
   limits: ConsentLimits,
 ): Promise<Consent> {
-  for (const amount of [limits.maxPaymentAmountMinor, limits.periodicMaxAmountMinor]) {
-    if (amount != null && (!Number.isSafeInteger(amount) || amount <= 0)) {
-      throw new Error("consent limits must be positive integer minor-unit amounts");
-    }
-  }
-  if (limits.validFrom && Number.isNaN(Date.parse(limits.validFrom))) {
-    throw new Error("invalid consent start date");
-  }
-  if (limits.validTo && Number.isNaN(Date.parse(limits.validTo))) {
-    throw new Error("invalid consent end date");
-  }
-  if (limits.validFrom && limits.validTo && Date.parse(limits.validTo) <= Date.parse(limits.validFrom)) {
-    throw new Error("consent end date must be after its start date");
-  }
+  validateConsentLimits(limits);
   const id = newId();
   await db
     .prepare(

@@ -38,6 +38,32 @@ export type BankLimitsState =
   | null;
 
 /**
+ * Lock this borrower's mandates to their business account, if it changed.
+ * Re-saving the same digits does nothing, so nobody is asked to approve again
+ * for no reason.
+ */
+async function savePayerAccount(
+  db: D1Database,
+  borrowerId: string,
+  payer: { accountNumber: string; sortCode: string },
+): Promise<{ changed: boolean; detachedPending: number }> {
+  const env = getEnv();
+  const borrower = await getBorrower(db, borrowerId);
+  const [currentAccount, currentSort] = await Promise.all([
+    unprotectString(borrower?.payer_account_number, env.APP_ENCRYPTION_KEY),
+    unprotectString(borrower?.payer_sort_code, env.APP_ENCRYPTION_KEY),
+  ]);
+  if (currentAccount === payer.accountNumber && currentSort === payer.sortCode) {
+    return { changed: false, detachedPending: 0 };
+  }
+  const { detachedPending } = await setBorrowerPayerAccount(db, borrowerId, {
+    accountNumber: (await protectString(payer.accountNumber, env.APP_ENCRYPTION_KEY))!,
+    sortCode: (await protectString(payer.sortCode, env.APP_ENCRYPTION_KEY))!,
+  });
+  return { changed: true, detachedPending };
+}
+
+/**
  * Set or correct the destination bank account and the VRP limits for a borrower
  * that has not authorised yet.
  *
@@ -147,19 +173,8 @@ export async function updateBankAndLimitsAction(
   }
 
   if (payer?.value) {
-    const env = getEnv();
-    const borrower = await getBorrower(db, borrowerId);
-    const [currentAccount, currentSort] = await Promise.all([
-      unprotectString(borrower?.payer_account_number, env.APP_ENCRYPTION_KEY),
-      unprotectString(borrower?.payer_sort_code, env.APP_ENCRYPTION_KEY),
-    ]);
-    if (currentAccount !== payer.value.accountNumber || currentSort !== payer.value.sortCode) {
-      const { detachedPending } = await setBorrowerPayerAccount(db, borrowerId, {
-        accountNumber: (await protectString(payer.value.accountNumber, env.APP_ENCRYPTION_KEY))!,
-        sortCode: (await protectString(payer.value.sortCode, env.APP_ENCRYPTION_KEY))!,
-      });
-      needsNewLink ||= detachedPending > 0;
-    }
+    const { detachedPending } = await savePayerAccount(db, borrowerId, payer.value);
+    needsNewLink ||= detachedPending > 0;
   }
 
   await writeAudit(db, {
@@ -172,4 +187,52 @@ export async function updateBankAndLimitsAction(
   // Said plainly, because the alternative is an operator believing a correction
   // took effect at the bank when the borrower still has to approve it.
   return { saved: true, needsNewLink };
+}
+
+export type PayerAccountState =
+  | { errors?: string[]; saved?: boolean; values?: { payerAccount: string; payerSort: string } }
+  | null;
+
+/**
+ * Set the business account for a borrower who has already approved a mandate.
+ *
+ * Once a borrower approves, the Edit page locks the limits and where money goes,
+ * because those are now their agreement with their bank. It locked the business
+ * account away with them, so nobody onboarded before mandates were locked to one
+ * could ever be given it.
+ *
+ * The approved mandate is not touched: the bank already agreed it. The account
+ * applies to every mandate made from now on, for example after Cancel mandate.
+ */
+export async function updatePayerAccountAction(
+  _prev: PayerAccountState,
+  fd: FormData,
+): Promise<PayerAccountState> {
+  // Who can set it at onboarding can set it here, matching the bank form.
+  const user = await requireRole("sales");
+  const db = getDb();
+
+  const borrowerId = String(fd.get("borrowerId") ?? "");
+  const values = {
+    payerAccount: String(fd.get("payerAccount") ?? ""),
+    payerSort: String(fd.get("payerSort") ?? ""),
+  };
+  if (!borrowerId || !(await getBorrower(db, borrowerId))) {
+    return { errors: ["Something went wrong: no borrower was selected."], values };
+  }
+  const payer = parsePayerAccount(values.payerAccount, values.payerSort);
+  if (!payer.value) return { errors: payer.errors, values };
+
+  const { changed } = await savePayerAccount(db, borrowerId, payer.value);
+  if (changed) {
+    await writeAudit(db, {
+      actorStaffId: user.id,
+      action: "borrower.payer_account.update",
+      entityType: "borrower",
+      entityId: borrowerId,
+    });
+  }
+  revalidatePath(`/borrowers/${borrowerId}`);
+  revalidatePath(`/borrowers/${borrowerId}/edit`);
+  return { saved: true };
 }
