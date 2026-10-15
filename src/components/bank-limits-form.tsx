@@ -5,7 +5,9 @@ import { TIPS } from "@/lib/help-text";
 import { useActionState } from "react";
 import {
   updateBankAndLimitsAction,
+  updatePayerAccountAction,
   type BankLimitsState,
+  type PayerAccountState,
 } from "@/lib/actions/bank-limits";
 import type { PayoutChoice } from "@/lib/payout-accounts";
 import { PayoutAccountSelect } from "@/components/payout-account-select";
@@ -56,15 +58,21 @@ export function BankLimitsForm({
 
   if (locked) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
-        <p className="font-medium text-slate-800">
-          These are locked in with the borrower&apos;s bank.
-        </p>
-        <p className="mt-1">
-          The borrower has already agreed these limits, so changing them here
-          would no longer match what their bank approved. To use different
-          limits, send a new setup link and ask them to approve again.
-        </p>
+      <div className="space-y-4">
+        <div className="rounded-lg border border-slate-200 bg-white p-5 text-sm text-slate-600">
+          <p className="font-medium text-slate-800">
+            The limits and where repayments are sent are locked in with the borrower&apos;s bank.
+          </p>
+          <p className="mt-1">
+            The borrower has already agreed these limits, so changing them here
+            would no longer match what their bank approved. To use different
+            limits, send a new setup link and ask them to approve again.
+          </p>
+        </div>
+        {/* The business account is not part of what the bank approved, so it
+            stays editable. Without this, borrowers onboarded before mandates
+            were locked to one could never be given one. */}
+        <PayerAccountForm borrowerId={borrowerId} payerMasked={payerMasked} />
       </div>
     );
   }
@@ -220,6 +228,93 @@ export function BankLimitsForm({
           className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
         >
           {pending ? "Saving…" : "Save bank details and limits"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Set the business account for a borrower whose mandate is already approved.
+ * Their current mandate keeps working as approved; every new one is locked to
+ * this account.
+ */
+function PayerAccountForm({
+  borrowerId,
+  payerMasked,
+}: {
+  borrowerId: string;
+  payerMasked: string | null;
+}) {
+  const [state, formAction, pending] = useActionState<PayerAccountState, FormData>(
+    updatePayerAccountAction,
+    null,
+  );
+  return (
+    <form action={formAction} className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
+      <input type="hidden" name="borrowerId" value={borrowerId} />
+      <div>
+        <h2 className="text-sm font-semibold text-slate-900">
+          Where repayments come from
+          <InfoTip text={TIPS.payerAccount} />
+        </h2>
+        <p className="mt-0.5 text-xs text-slate-500">
+          {payerMasked
+            ? `Locked to the business account ${payerMasked}. Enter a different one to change it.`
+            : "No business account on file yet. Add it so any new mandate can only be approved from it."}{" "}
+          Their current mandate keeps working exactly as their bank approved it.
+        </p>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">Business account number</span>
+          <input
+            name="payerAccount"
+            inputMode="numeric"
+            required
+            placeholder="12345678"
+            defaultValue={state?.values?.payerAccount ?? ""}
+            className={input}
+          />
+        </label>
+        <label className="block">
+          <span className="text-sm font-medium text-slate-700">Business sort code</span>
+          <input
+            name="payerSort"
+            inputMode="numeric"
+            required
+            placeholder="12-34-56"
+            defaultValue={state?.values?.payerSort ?? ""}
+            className={input}
+          />
+        </label>
+      </div>
+      {state?.errors && state.errors.length > 0 && (
+        <ul
+          role="alert"
+          className="list-disc space-y-1 rounded-md border border-red-200 bg-red-50 p-3 pl-7 text-sm text-red-800"
+        >
+          {state.errors.map((e) => (
+            <li key={e}>{e}</li>
+          ))}
+        </ul>
+      )}
+      {state?.saved && (
+        <p
+          role="status"
+          className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900"
+        >
+          ✓ Saved. Their current mandate is unchanged. Any new mandate, for example after
+          Cancel mandate, can only be approved from this account.
+        </p>
+      )}
+      <div className="flex justify-end">
+        <button
+          type="submit"
+          disabled={pending}
+          className="rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+        >
+          {pending ? "Saving…" : "Save business account"}
         </button>
       </div>
     </form>

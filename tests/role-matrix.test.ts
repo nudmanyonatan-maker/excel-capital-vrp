@@ -25,6 +25,7 @@ const EXPECTED: Record<string, Role | "public"> = {
   updateBorrowerDetailsAction: "sales",
   updateBorrowerDetailsFormAction: "sales",
   updateBankAndLimitsAction: "sales",
+  updatePayerAccountAction: "sales",
   sendSetupLinkAction: "sales",
   sendTestPaymentAction: "sales",
 
