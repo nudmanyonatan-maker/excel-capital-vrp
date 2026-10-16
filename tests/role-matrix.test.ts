@@ -98,6 +98,55 @@ describe("who can do what", () => {
   });
 });
 
+const API_DIR = path.join(__dirname, "..", "src", "app", "api");
+
+/**
+ * The same statement for API routes. The action list above never saw these,
+ * which is how the Companies House search stayed at "operator" when onboarding
+ * moved to "sales": reps could open the form but every search said "Not
+ * authorised." "staff" is any signed-in staff member (requireUser). "none"
+ * means no staff check, because the route proves who is calling another way
+ * (cron secret, Plaid signature, dev only, health).
+ */
+const EXPECTED_ROUTES: Record<string, Role | "staff" | "none"> = {
+  "audit/export": "staff",
+  "companies/search": "sales",
+  "cron/run": "none",
+  "dev-login": "none",
+  "health": "none",
+  "payments/export": "staff",
+  "webhooks/plaid": "none",
+};
+
+function routeFiles(dir: string, prefix = ""): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) return routeFiles(path.join(dir, entry.name), rel);
+    return entry.name === "route.ts" ? [prefix] : [];
+  });
+}
+
+function actualRouteRoles(): Record<string, Role | "staff" | "none" | "mixed"> {
+  const found: Record<string, Role | "staff" | "none" | "mixed"> = {};
+  for (const route of routeFiles(API_DIR)) {
+    const source = readFileSync(path.join(API_DIR, route, "route.ts"), "utf8");
+    const roles = new Set<string>([...source.matchAll(/requireRole\("(\w+)"\)/g)].map((m) => m[1]));
+    if (/requireUser\(\)/.test(source)) roles.add("staff");
+    found[route] = roles.size === 0 ? "none" : roles.size === 1 ? ([...roles][0] as Role) : "mixed";
+  }
+  return found;
+}
+
+describe("who can call which API route", () => {
+  it("every route requires exactly the role listed", () => {
+    expect(actualRouteRoles()).toEqual(EXPECTED_ROUTES);
+  });
+
+  it("the onboarding form's company search is open to the reps who use it", () => {
+    expect(hasRole({ role: "sales" } as StaffUser, EXPECTED_ROUTES["companies/search"] as Role)).toBe(true);
+  });
+});
+
 describe("storing the sales role", () => {
   it("round-trips every role", () => {
     for (const role of ROLES) {

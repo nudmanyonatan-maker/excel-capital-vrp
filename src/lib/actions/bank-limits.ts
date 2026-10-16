@@ -172,8 +172,10 @@ export async function updateBankAndLimitsAction(
     });
   }
 
+  let payerAccountChanged = false;
   if (payer?.value) {
-    const { detachedPending } = await savePayerAccount(db, borrowerId, payer.value);
+    const { changed, detachedPending } = await savePayerAccount(db, borrowerId, payer.value);
+    payerAccountChanged = changed;
     needsNewLink ||= detachedPending > 0;
   }
 
@@ -182,6 +184,10 @@ export async function updateBankAndLimitsAction(
     action: "borrower.bank_and_limits.update",
     entityType: "borrower",
     entityId: borrowerId,
+    // Which part changed, never the digits. A NatWest borrower was refused three
+    // times and approved minutes after an edit here, and the row could not say
+    // whether that edit corrected their business account or only the limits.
+    metadata: { payerAccountChanged, needsNewLink },
   });
   revalidatePath(`/borrowers/${borrowerId}`);
   // Said plainly, because the alternative is an operator believing a correction

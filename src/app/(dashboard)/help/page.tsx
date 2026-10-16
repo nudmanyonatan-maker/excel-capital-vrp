@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { RoleGuide } from "@/components/role-guide";
 import { TIPS } from "@/lib/help-text";
+import { FALLBACK_SETUP_FAILURE_ADVICE, SETUP_FAILURE_ADVICE } from "@/lib/setup-failure-advice";
 
 export const dynamic = "force-dynamic";
 
@@ -243,8 +244,8 @@ export default function HelpPage() {
 
         <Section id="failed" title="When a borrower cannot connect">
           <p>
-            If a borrower&apos;s bank refuses, a red box appears on their page saying which bank and why. Find the
-            error code in it:
+            If a borrower&apos;s bank refuses, a red box appears on their page saying which bank, the error code,
+            and what to do. The same advice for each code:
           </p>
           <table className="w-full text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-slate-500">
@@ -254,22 +255,15 @@ export default function HelpPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 align-top">
-              <tr>
-                <td className="py-2 pr-3 font-mono text-xs">PAYMENT_CONSENT_INVALID_CONSTRAINTS</td>
-                <td className="py-2">
-                  Fixed on 5 October for Monzo. Send them a new setup link and ask them to try again.
-                </td>
-              </tr>
-              <tr>
-                <td className="py-2 pr-3 font-mono text-xs">PAYMENT_CONSENT_CANCELLED</td>
-                <td className="py-2">The borrower backed out at their bank. Send the link again when they are ready.</td>
-              </tr>
+              {SETUP_FAILURE_ADVICE.map(({ code, advice }) => (
+                <tr key={code}>
+                  <td className="py-2 pr-3 font-mono text-xs">{code}</td>
+                  <td className="py-2">{advice}</td>
+                </tr>
+              ))}
               <tr>
                 <td className="py-2 pr-3">Anything else</td>
-                <td className="py-2">
-                  Send a new link and ask them to try once more. If it fails again, send Yonatan the{" "}
-                  <strong>Plaid session</strong> shown in the red box.
-                </td>
+                <td className="py-2">{FALLBACK_SETUP_FAILURE_ADVICE}</td>
               </tr>
             </tbody>
           </table>
