@@ -25,6 +25,7 @@ import { formatMinor } from "@/lib/money";
 import { destinationsReadiness } from "@/lib/readiness";
 import { setupProgress } from "@/lib/setup-progress";
 import { latestAuditEntry, SETUP_FAILED_ACTION } from "@/lib/repo/audit";
+import { setupFailureAdvice } from "@/lib/setup-failure-advice";
 import { loanProgress, paymentKind } from "@/lib/loan-progress";
 import { listDestinations } from "@/lib/repo/destinations";
 import { blockedReason, combinedCeiling, destinationLabel } from "@/lib/destinations";
@@ -261,6 +262,11 @@ export default async function BorrowerProfile({
           </h2>
           <p className="mt-1 text-sm text-red-900">
             {failure.displayMessage ?? failure.errorMessage ?? "The bank gave no reason."}
+          </p>
+          {/* The line above is written for the borrower. This one is for staff. */}
+          <p className="mt-2 text-sm text-red-900">
+            <span className="font-medium">What to do: </span>
+            {setupFailureAdvice(failure.errorCode)}
           </p>
           <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 text-xs text-red-900 sm:grid-cols-2">
             {failure.institutionName && (
