@@ -12,11 +12,13 @@ export const dynamic = "force-dynamic";
  * Company search for the onboarding form.
  *
  * Proxied through the Worker so the Companies House API key stays a server
- * secret. Staff-only: this is a lookup tool for operators, not a public search.
+ * secret. Staff-only: this is a lookup tool for whoever onboards borrowers,
+ * not a public search. That includes sales reps, so it is guarded at "sales",
+ * the same as the onboarding page and createBorrowerAction that use it.
  */
 export async function GET(request: Request) {
   try {
-    await requireRole("operator");
+    await requireRole("sales");
   } catch (error) {
     if (error instanceof AuthError) {
       return Response.json({ error: "Not authorised." }, { status: 403 });
