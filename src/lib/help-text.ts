@@ -81,6 +81,18 @@ export const TIPS = {
   // One-off payment
   oneOffAmount: "In pounds. At least £1.00, and no more than the borrower's single payment limit.",
   oneOffReason: "Shown on the borrower's bank statement, for example \"Late fee\". Keep it short.",
+
+  // Overview
+  overviewCollected:
+    "Money that has left the borrower's bank for ours. Counted on the day the payment was sent.",
+  overviewDue:
+    "What the schedules will try to collect from active borrowers, assuming every payment goes through. Paused borrowers are left out.",
+  overviewUnrecovered:
+    "Payments from the last 30 days that failed and have not been collected since, by a retry or otherwise. Retry them from the borrower's page.",
+  overviewInFlight:
+    "Sent to the bank and not confirmed yet. Most settle within minutes.",
+  overviewWaiting:
+    "Borrowers who have not finished setup. \"Them\" means the borrower needs to approve. \"Us\" means something here needs fixing first.",
 } as const;
 
 export type TipKey = keyof typeof TIPS;

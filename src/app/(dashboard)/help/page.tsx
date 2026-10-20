@@ -19,6 +19,7 @@ const SECTIONS = [
   { id: "start", title: "Start here" },
   { id: "roles", title: "Who can do what" },
   { id: "tips", title: "The little i" },
+  { id: "overview", title: "The Overview page" },
   { id: "onboard", title: "Onboard a borrower" },
   { id: "setup-link", title: "Send the setup link" },
   { id: "test", title: "Check it works with £1" },
@@ -125,6 +126,18 @@ export default function HelpPage() {
             see what the field is for and what to put in it.
           </p>
           <Shot src="/help/tooltip.png" alt="An i next to a field, showing its explanation" width={769} height={393} />
+        </Section>
+
+        <Section id="overview" title="The Overview page">
+          <p>
+            The first page you see. It shows the money collected this month and in the last 7 days, what
+            is due in the next 7 days, payments that failed and have not been collected since, and borrowers
+            who have not finished setup. Click any name to go to that borrower.
+          </p>
+          <p>
+            In <strong>Waiting on setup</strong>, <strong>Them</strong> means the borrower needs to approve
+            with their bank, and <strong>Us</strong> means something on our side needs fixing first.
+          </p>
         </Section>
 
         <Section id="onboard" title="Onboard a borrower" who="Sales reps, operators, admins">
