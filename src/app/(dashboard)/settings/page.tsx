@@ -162,7 +162,7 @@ export default async function SettingsPage() {
           action={updateSettingsFormAction}
           className="space-y-5 rounded-lg border border-slate-200 bg-white p-5"
         >
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <Field
               name="defaultRetryMax"
               type="number"

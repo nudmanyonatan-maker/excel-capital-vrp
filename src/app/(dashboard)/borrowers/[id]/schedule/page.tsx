@@ -54,7 +54,7 @@ export default async function SchedulePage({
 
       <ActionForm action={updateScheduleFormAction} className="space-y-4 rounded-lg border border-slate-200 bg-white p-5">
         <input type="hidden" name="borrowerId" value={id} />
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-slate-700">
             Amount (£) *

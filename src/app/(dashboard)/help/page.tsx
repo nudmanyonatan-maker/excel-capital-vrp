@@ -260,7 +260,8 @@ export default function HelpPage() {
             If a borrower&apos;s bank refuses, a red box appears on their page saying which bank, the error code,
             and what to do. The same advice for each code:
           </p>
-          <table className="w-full text-left text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[480px] text-left text-sm">
             <thead className="text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="py-1 pr-3 font-medium">Error code</th>
@@ -280,6 +281,7 @@ export default function HelpPage() {
               </tr>
             </tbody>
           </table>
+          </div>
         </Section>
 
         <Section id="accounts" title="Bank accounts repayments go to" who="Admins">
