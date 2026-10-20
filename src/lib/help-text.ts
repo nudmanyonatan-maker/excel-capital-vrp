@@ -89,6 +89,8 @@ export const TIPS = {
     "What the schedules will try to collect from active borrowers, assuming every payment goes through. Paused borrowers are left out.",
   overviewUnrecovered:
     "Payments from the last 30 days that failed and have not been collected since, by a retry or otherwise. Retry them from the borrower's page.",
+  overviewSuccessRate:
+    "Of the collections in this period that finished, the share that went through. Ones still being processed are not counted yet.",
   overviewInFlight:
     "Sent to the bank and not confirmed yet. Most settle within minutes.",
   overviewWaiting:

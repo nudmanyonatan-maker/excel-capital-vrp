@@ -88,3 +88,117 @@ export function plainFailureReason(reason: string | null | undefined): string {
   if (reason.includes("FAILED")) return "Failed at their bank";
   return reason.length > 80 ? `${reason.slice(0, 77)}...` : reason;
 }
+
+export interface Period {
+  /** As it appears in the URL: "month", "last-month", "7d", "30d", "90d", "year", "all" or "YYYY-MM". */
+  key: string;
+  label: string;
+  /** Inclusive YYYY-MM-DD bounds. */
+  from: string;
+  to: string;
+  /** The period just before, of the same length, to compare against. Null for "all". */
+  prevFrom: string | null;
+  prevTo: string | null;
+  prevLabel: string | null;
+}
+
+export const PERIOD_CHOICES: { key: string; label: string }[] = [
+  { key: "month", label: "This month" },
+  { key: "last-month", label: "Last month" },
+  { key: "7d", label: "Last 7 days" },
+  { key: "30d", label: "Last 30 days" },
+  { key: "90d", label: "Last 90 days" },
+  { key: "year", label: "This year" },
+  { key: "all", label: "All time" },
+];
+
+function shift(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+function lastDayOf(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+}
+
+function monthBefore(month: string): string {
+  const [y, m] = month.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7);
+}
+
+const monthName = (month: string) =>
+  new Intl.DateTimeFormat("en-GB", { month: "long", year: "numeric", timeZone: "UTC" }).format(
+    new Date(`${month}-01T00:00:00Z`),
+  );
+
+/**
+ * Turn the period chosen on the Overview into dates. Anything unrecognised,
+ * including a month that has not happened yet, means this month: the value
+ * comes from the URL, so it is treated as untrusted.
+ */
+export function resolvePeriod(key: string | undefined, today: string): Period {
+  const thisMonth = today.slice(0, 7);
+  const days = { "7d": 7, "30d": 30, "90d": 90 }[key ?? ""];
+  if (days) {
+    const from = shift(today, -(days - 1));
+    return {
+      key: key!,
+      label: `Last ${days} days`,
+      from,
+      to: today,
+      prevFrom: shift(from, -days),
+      prevTo: shift(from, -1),
+      prevLabel: `the ${days} days before`,
+    };
+  }
+  if (key === "all") {
+    return { key, label: "All time", from: "0000-01-01", to: today, prevFrom: null, prevTo: null, prevLabel: null };
+  }
+  if (key === "year") {
+    const year = today.slice(0, 4);
+    const prevYear = String(Number(year) - 1);
+    return {
+      key,
+      label: `This year`,
+      from: `${year}-01-01`,
+      to: today,
+      prevFrom: `${prevYear}-01-01`,
+      prevTo: `${prevYear}${today.slice(4)}`,
+      prevLabel: `the same point in ${prevYear}`,
+    };
+  }
+  const month =
+    key === "last-month" ? monthBefore(thisMonth) : key && /^\d{4}-(0[1-9]|1[0-2])$/.test(key) && key < thisMonth ? key : null;
+  if (month) {
+    const prev = monthBefore(month);
+    return {
+      key: key!,
+      label: key === "last-month" ? "Last month" : monthName(month),
+      from: `${month}-01`,
+      to: lastDayOf(month),
+      prevFrom: `${prev}-01`,
+      prevTo: lastDayOf(prev),
+      prevLabel: monthName(prev),
+    };
+  }
+  // This month so far, against the same days of last month (clamped to its end).
+  const prev = monthBefore(thisMonth);
+  const sameDay = `${prev}-${today.slice(8)}`;
+  return {
+    key: "month",
+    label: "This month",
+    from: `${thisMonth}-01`,
+    to: today,
+    prevFrom: `${prev}-01`,
+    prevTo: sameDay > lastDayOf(prev) ? lastDayOf(prev) : sameDay,
+    prevLabel: `the same days of ${monthName(prev)}`,
+  };
+}
+
+/** Whole-percent change from `before` to `now`, or null when there is nothing to compare. */
+export function percentChange(now: number, before: number): number | null {
+  if (before <= 0) return null;
+  return Math.round(((now - before) / before) * 100);
+}

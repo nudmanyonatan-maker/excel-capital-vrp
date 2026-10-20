@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { projectCollections, lastMonths, plainFailureReason } from "@/lib/overview";
+import { projectCollections, lastMonths, plainFailureReason, resolvePeriod, percentChange } from "@/lib/overview";
 import type { ScheduleSpec } from "@/lib/schedule";
 
 const weekdays: ScheduleSpec = {
@@ -105,5 +105,62 @@ describe("failure reasons in words", () => {
 
   it("keeps an unknown reason short", () => {
     expect(plainFailureReason("x".repeat(200)).length).toBeLessThanOrEqual(80);
+  });
+});
+
+describe("choosing a period", () => {
+  const today = "2026-10-20";
+
+  it("defaults to this month so far, compared with the same days last month", () => {
+    expect(resolvePeriod(undefined, today)).toMatchObject({
+      key: "month",
+      from: "2026-10-01",
+      to: "2026-10-20",
+      prevFrom: "2026-09-01",
+      prevTo: "2026-09-20",
+    });
+  });
+
+  it("takes a whole past month, compared with the month before", () => {
+    expect(resolvePeriod("2026-09", today)).toMatchObject({
+      key: "2026-09",
+      label: "September 2026",
+      from: "2026-09-01",
+      to: "2026-09-30",
+      prevFrom: "2026-08-01",
+      prevTo: "2026-08-31",
+    });
+  });
+
+  it("takes the last N days, compared with the N days before", () => {
+    expect(resolvePeriod("30d", today)).toMatchObject({
+      from: "2026-09-21",
+      to: "2026-10-20",
+      prevFrom: "2026-08-22",
+      prevTo: "2026-09-20",
+    });
+  });
+
+  it("clamps a short month when comparing month to date", () => {
+    expect(resolvePeriod("month", "2026-03-31")).toMatchObject({ prevFrom: "2026-02-01", prevTo: "2026-02-28" });
+  });
+
+  it("has nothing to compare all time with", () => {
+    expect(resolvePeriod("all", today)).toMatchObject({ from: "0000-01-01", prevFrom: null });
+  });
+
+  it("ignores a month in the future or nonsense, falling back to this month", () => {
+    expect(resolvePeriod("2027-01", today).key).toBe("month");
+    expect(resolvePeriod("drop table", today).key).toBe("month");
+  });
+});
+
+describe("percentage change", () => {
+  it("is null with nothing to compare against", () => {
+    expect(percentChange(500, 0)).toBeNull();
+  });
+  it("rounds to a whole percent", () => {
+    expect(percentChange(150, 100)).toBe(50);
+    expect(percentChange(66, 100)).toBe(-34);
   });
 });

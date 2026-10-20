@@ -4,7 +4,7 @@ import { collectionProgress } from "@/lib/repo/payments";
 import { toSpec } from "@/lib/repo/schedules";
 import { SETUP_FAILED_ACTION } from "@/lib/repo/audit";
 import { setupProgress } from "@/lib/setup-progress";
-import { lastMonths, projectCollections } from "@/lib/overview";
+import { lastMonths, percentChange, projectCollections, resolvePeriod, type Period } from "@/lib/overview";
 import type { Payment, RepaymentSchedule } from "@/lib/types";
 
 /**
@@ -50,8 +50,43 @@ export interface EndingMandate {
   validTo: string;
 }
 
+export interface PeriodSummary {
+  period: Period;
+  collected: Money;
+  /** The same-length period just before, or null for "all time". */
+  previous: Money | null;
+  /** Whole-percent change in money collected against `previous`. */
+  change: number | null;
+  failed: Money;
+  /** Share of finished attempts in the period that went through, 0 to 100. */
+  successRate: number | null;
+  topBorrowers: { borrowerId: string; name: string; minor: number; count: number }[];
+}
+
+export interface OwedByBorrower {
+  borrowerId: string;
+  name: string;
+  totalMinor: number;
+  payments: Payment[];
+}
+
+export interface OverviewOptions {
+  /** Period key from the URL; see resolvePeriod. */
+  period?: string;
+  /** How many days ahead "Coming up" looks: 7, 14 or 30. */
+  aheadDays?: number;
+}
+
+export const AHEAD_CHOICES = [7, 14, 30] as const;
+
 export interface Overview {
   today: string;
+  /** When this was read, for the page to say how fresh it is. */
+  generatedAt: string;
+  inPeriod: PeriodSummary;
+  /** Failures still owed, grouped by borrower, biggest first. */
+  owedByBorrower: OwedByBorrower[];
+  aheadDays: number;
   collected: { today: Money; last7Days: Money; thisMonth: Money; allTime: Money };
   inFlight: Money;
   byMonth: { month: string; minor: number; count: number }[];
@@ -80,10 +115,18 @@ function money(row: { n: number | null; m: number | null } | null): Money {
   return { count: row?.n ?? 0, minor: row?.m ?? 0 };
 }
 
-export async function loadOverview(db: D1Database, now: Date = new Date()): Promise<Overview> {
+export async function loadOverview(
+  db: D1Database,
+  now: Date = new Date(),
+  options: OverviewOptions = {},
+): Promise<Overview> {
   const today = now.toISOString().slice(0, 10);
   const monthStart = `${today.slice(0, 7)}-01`;
-  const months = lastMonths(today, 6);
+  const months = lastMonths(today, 12);
+  const period = resolvePeriod(options.period, today);
+  const aheadDays = (AHEAD_CHOICES as readonly number[]).includes(options.aheadDays ?? 0)
+    ? options.aheadDays!
+    : UPCOMING_DAYS;
 
   const live = "borrower_id IN (SELECT id FROM borrowers WHERE deleted_at IS NULL)";
   const sumSince = (since: string) =>
@@ -94,6 +137,29 @@ export async function loadOverview(db: D1Database, now: Date = new Date()): Prom
       )
       .bind(since)
       .first<{ n: number; m: number | null }>();
+
+  const sumBetween = (statuses: string, from: string, to: string) =>
+    db
+      .prepare(
+        `SELECT COUNT(*) AS n, SUM(amount_minor) AS m FROM payments
+          WHERE status IN (${statuses}) AND substr(created_at, 1, 10) BETWEEN ? AND ? AND ${live}`,
+      )
+      .bind(from, to)
+      .first<{ n: number; m: number | null }>();
+
+  const [periodRow, previousRow, failedRow, topRows] = await Promise.all([
+    sumBetween(COLLECTED, period.from, period.to),
+    period.prevFrom ? sumBetween(COLLECTED, period.prevFrom, period.prevTo!) : Promise.resolve(null),
+    sumBetween("'failed','rejected'", period.from, period.to),
+    db
+      .prepare(
+        `SELECT borrower_id, COUNT(*) AS n, SUM(amount_minor) AS m FROM payments
+          WHERE status IN (${COLLECTED}) AND substr(created_at, 1, 10) BETWEEN ? AND ? AND ${live}
+          GROUP BY borrower_id ORDER BY m DESC LIMIT 5`,
+      )
+      .bind(period.from, period.to)
+      .all<{ borrower_id: string; n: number; m: number }>(),
+  ]);
 
   const [todayRow, weekRow, monthRow, allRow, inFlightRow, monthRows, unknownRow] =
     await Promise.all([
@@ -176,7 +242,7 @@ export async function loadOverview(db: D1Database, now: Date = new Date()): Prom
       }),
     ),
     today,
-    UPCOMING_DAYS,
+    aheadDays,
   );
   const days = new Map<string, UpcomingDay>();
   for (const run of projected) {
@@ -250,8 +316,43 @@ export async function loadOverview(db: D1Database, now: Date = new Date()): Prom
     .filter((r) => nameById.has(r.borrower_id))
     .map((r) => ({ borrowerId: r.borrower_id, name: nameById.get(r.borrower_id)!, validTo: r.valid_to }));
 
+  const collectedInPeriod = money(periodRow);
+  const failedInPeriod = money(failedRow);
+  const previous = previousRow ? money(previousRow) : null;
+  const finished = collectedInPeriod.count + failedInPeriod.count;
+
+  const owed = new Map<string, OwedByBorrower>();
+  for (const { payment, borrowerName } of unrecovered) {
+    const group = owed.get(payment.borrower_id) ?? {
+      borrowerId: payment.borrower_id,
+      name: borrowerName,
+      totalMinor: 0,
+      payments: [],
+    };
+    group.totalMinor += payment.amount_minor;
+    group.payments.push(payment);
+    owed.set(payment.borrower_id, group);
+  }
+
   return {
     today,
+    generatedAt: now.toISOString(),
+    inPeriod: {
+      period,
+      collected: collectedInPeriod,
+      previous,
+      change: previous ? percentChange(collectedInPeriod.minor, previous.minor) : null,
+      failed: failedInPeriod,
+      successRate: finished > 0 ? Math.round((collectedInPeriod.count / finished) * 100) : null,
+      topBorrowers: (topRows.results ?? []).map((r) => ({
+        borrowerId: r.borrower_id,
+        name: nameById.get(r.borrower_id) ?? "Unknown borrower",
+        minor: r.m,
+        count: r.n,
+      })),
+    },
+    owedByBorrower: [...owed.values()].sort((a, b) => b.totalMinor - a.totalMinor),
+    aheadDays,
     collected: {
       today: money(todayRow),
       last7Days: money(weekRow),

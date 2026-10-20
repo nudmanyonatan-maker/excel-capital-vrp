@@ -88,13 +88,13 @@ export default async function PaymentsPage({
 
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <ReconCard
-          label="In flight"
+          label="Being processed"
           count={summary.inFlightCount}
           amount={formatMinor(summary.inFlightMinor)}
           tone="sky"
         />
         <ReconCard
-          label="Settled"
+          label="Collected"
           count={summary.settledCount}
           amount={formatMinor(summary.settledMinor)}
           tone="emerald"

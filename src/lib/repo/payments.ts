@@ -321,14 +321,22 @@ export interface PaymentSummary {
 }
 
 /** Aggregate totals for reconciliation (all borrowers). */
+/**
+ * Totals for the Payments page cards.
+ *
+ * "Executed" is money that has left the borrower's bank, so it counts as
+ * collected, the same as a loan's own progress (SETTLED_ONLY). It used to sit
+ * under "In flight", which showed every penny ever collected as in flight and
+ * GBP 0.00 settled, because UK payments stop at executed and never reach settled.
+ */
 export async function paymentSummary(db: D1Database): Promise<PaymentSummary> {
   const row = await db
     .prepare(
       `SELECT
-         COALESCE(SUM(CASE WHEN status IN ('pending','unknown','submitted','initiated','executed') THEN 1 ELSE 0 END),0) AS inflight_n,
-         COALESCE(SUM(CASE WHEN status IN ('pending','unknown','submitted','initiated','executed') THEN amount_minor ELSE 0 END),0) AS inflight_m,
-         COALESCE(SUM(CASE WHEN status = 'settled' THEN 1 ELSE 0 END),0) AS settled_n,
-         COALESCE(SUM(CASE WHEN status = 'settled' THEN amount_minor ELSE 0 END),0) AS settled_m,
+         COALESCE(SUM(CASE WHEN status IN ('pending','unknown','submitted','initiated') THEN 1 ELSE 0 END),0) AS inflight_n,
+         COALESCE(SUM(CASE WHEN status IN ('pending','unknown','submitted','initiated') THEN amount_minor ELSE 0 END),0) AS inflight_m,
+         COALESCE(SUM(CASE WHEN status IN ('executed','settled') THEN 1 ELSE 0 END),0) AS settled_n,
+         COALESCE(SUM(CASE WHEN status IN ('executed','settled') THEN amount_minor ELSE 0 END),0) AS settled_m,
          COALESCE(SUM(CASE WHEN status IN ('failed','rejected') THEN 1 ELSE 0 END),0) AS failed_n,
          COALESCE(SUM(CASE WHEN status IN ('failed','rejected') THEN amount_minor ELSE 0 END),0) AS failed_m
        FROM payments`,
