@@ -6,6 +6,7 @@ import { getBorrower } from "@/lib/repo/borrowers";
 import { getActiveConsent } from "@/lib/repo/consents";
 import { getActiveSchedule, isStoredDaily, parseDaysOfWeek, toSpec } from "@/lib/repo/schedules";
 import { earlyCollection } from "@/lib/early-collection";
+import { failureStillRelevant } from "@/lib/setup-failure";
 import { listPaymentsForBorrower, collectionProgress } from "@/lib/repo/payments";
 import { latestSetupLinkForBorrower } from "@/lib/repo/setup-links";
 import { getCurrentUser, hasRole } from "@/lib/auth";
@@ -168,7 +169,9 @@ export default async function BorrowerProfile({
   // What the bank actually said, the last time this borrower could not finish.
   // Kept as the provider's own words rather than a paraphrase, because the point
   // of showing it is to stop anyone theorising about a screenshot.
-  const failure = parseSetupFailure(lastSetupFailure);
+  const lastFailure = parseSetupFailure(lastSetupFailure);
+  const failure =
+    lastFailure && failureStillRelevant(lastFailure.at, lastApproval?.created_at) ? lastFailure : null;
   // The bank they last approved with. Only recorded from 14 Oct 2026 on, and
   // not when an approval is found by a background check instead of the page.
   const approvedWith = (() => {
