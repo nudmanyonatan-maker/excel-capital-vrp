@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import type { Role } from "@/lib/types";
 
 const LINKS = [
+  { href: "/overview", label: "Overview" },
   { href: "/borrowers", label: "Borrowers" },
   { href: "/payments", label: "Payments" },
   { href: "/audit", label: "Audit" },
