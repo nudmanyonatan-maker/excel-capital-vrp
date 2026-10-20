@@ -114,8 +114,25 @@ const Empty = ({ children }: { children: React.ReactNode }) => (
   <p className="rounded-lg bg-slate-50 px-3 py-4 text-center text-sm text-slate-500">{children}</p>
 );
 
-function Change({ change, against }: { change: number | null; against: string | null }) {
-  if (change == null || !against) return null;
+function Change({
+  change,
+  against,
+  previousMinor,
+}: {
+  change: number | null;
+  against: string | null;
+  previousMinor: number | null;
+}) {
+  if (!against || previousMinor == null) return null;
+  // A percentage off a tiny base reads as nonsense ("up 33822%" on a GBP 30
+  // test month), so past a point say what it was instead.
+  if (change == null || Math.abs(change) > 500) {
+    return (
+      <span className="text-slate-500">
+        {previousMinor === 0 ? "Nothing" : formatMinor(previousMinor)} in {against}
+      </span>
+    );
+  }
   const up = change >= 0;
   return (
     <span className={`font-medium ${up ? "text-emerald-700" : "text-red-700"}`}>
@@ -197,7 +214,11 @@ export default async function OverviewPage({
           sub={
             <span className="flex flex-wrap gap-x-2">
               <span>{plural(o.inPeriod.collected.count, "payment")}</span>
-              <Change change={o.inPeriod.change} against={o.inPeriod.period.prevLabel} />
+              <Change
+                change={o.inPeriod.change}
+                against={o.inPeriod.period.prevLabel}
+                previousMinor={o.inPeriod.previous?.minor ?? null}
+              />
             </span>
           }
         />
