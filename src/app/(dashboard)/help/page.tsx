@@ -130,13 +130,15 @@ export default function HelpPage() {
 
         <Section id="overview" title="The Overview page">
           <p>
-            The first page you see. It shows the money collected this month and in the last 7 days, what
-            is due in the next 7 days, payments that failed and have not been collected since, and borrowers
-            who have not finished setup. Click any name to go to that borrower.
+            The first page you see. Use <strong>Showing</strong> at the top to pick a period, such as last
+            month or any past month, and the top row shows what was collected, how many collections went
+            through, and what failed in it, compared with the period before. Click a card to see those payments.
           </p>
           <p>
-            In <strong>Waiting on setup</strong>, <strong>Them</strong> means the borrower needs to approve
-            with their bank, and <strong>Us</strong> means something on our side needs fixing first.
+            Click a day under <strong>Coming up</strong>, or a borrower under <strong>Still owed</strong>, to
+            open the detail. In <strong>Waiting on setup</strong>, <strong>On them</strong> means the borrower
+            needs to approve with their bank, and <strong>On us</strong> means something on our side needs
+            fixing first. Click a month in the chart to open that month.
           </p>
         </Section>
 

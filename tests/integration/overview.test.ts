@@ -142,3 +142,45 @@ describe("the overview's borrowers waiting on setup", () => {
     expect(row?.lastFailureAt).not.toBeNull();
   });
 });
+
+describe("the overview's chosen period", () => {
+  // Its own year, so nothing else in this file lands in these windows.
+  const LATER = new Date("2032-06-15T12:00:00Z");
+
+  it("sums a past month, compares it with the month before, and ranks who paid", async () => {
+    const a = await borrower();
+    const b = await borrower();
+    await payment(a.id, "executed", 30_000, "2032-05-03T09:00:00Z");
+    await payment(b.id, "executed", 10_000, "2032-05-10T09:00:00Z");
+    await payment(b.id, "failed", 10_000, "2032-05-17T09:00:00Z");
+    await payment(a.id, "executed", 20_000, "2032-04-20T09:00:00Z");
+
+    const o = await loadOverview(env.DB, LATER, { period: "2032-05" });
+
+    expect(o.inPeriod.period.label).toBe("May 2032");
+    expect(o.inPeriod.collected).toEqual({ count: 2, minor: 40_000 });
+    expect(o.inPeriod.previous).toEqual({ count: 1, minor: 20_000 });
+    expect(o.inPeriod.change).toBe(100);
+    expect(o.inPeriod.successRate).toBe(67);
+    expect(o.inPeriod.topBorrowers.map((t) => t.borrowerId)).toEqual([a.id, b.id]);
+  });
+
+  it("groups what is still owed by borrower, biggest first", async () => {
+    const small = await borrower();
+    const big = await borrower();
+    await payment(small.id, "failed", 1_000, "2032-06-10T09:00:00Z");
+    await payment(big.id, "failed", 5_000, "2032-06-11T09:00:00Z");
+    await payment(big.id, "failed", 5_000, "2032-06-12T09:00:00Z");
+
+    const o = await loadOverview(env.DB, LATER);
+    const ids = o.owedByBorrower.map((g) => g.borrowerId);
+
+    expect(ids.indexOf(big.id)).toBeLessThan(ids.indexOf(small.id));
+    expect(o.owedByBorrower.find((g) => g.borrowerId === big.id)?.totalMinor).toBe(10_000);
+  });
+
+  it("looks as far ahead as asked, and only 7, 14 or 30 days", async () => {
+    expect((await loadOverview(env.DB, LATER, { aheadDays: 30 })).aheadDays).toBe(30);
+    expect((await loadOverview(env.DB, LATER, { aheadDays: 365 })).aheadDays).toBe(7);
+  });
+});
