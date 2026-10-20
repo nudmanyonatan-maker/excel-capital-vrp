@@ -76,7 +76,7 @@ export default async function PaymentsPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Payments</h1>
         <a
           href="/api/payments/export"
@@ -107,13 +107,13 @@ export default async function PaymentsPage({
         />
       </div>
 
-      <form method="get" className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4">
+      <form method="get" className="mb-4 grid grid-cols-2 items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex sm:flex-wrap">
         <label className="block">
           <span className="text-xs font-medium text-slate-600">Borrower</span>
           <select
             name="borrower"
             defaultValue={borrowerId ?? ""}
-            className="mt-1 block rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
+            className="mt-1 block w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm sm:w-auto"
           >
             <option value="">Everyone</option>
             {borrowers.map((b) => (
@@ -128,7 +128,7 @@ export default async function PaymentsPage({
           <select
             name="status"
             defaultValue={status}
-            className="mt-1 block rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm capitalize"
+            className="mt-1 block w-full sm:w-auto rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm capitalize"
           >
             {STATUSES.map((s) => (
               <option key={s} value={s}>
@@ -143,7 +143,7 @@ export default async function PaymentsPage({
             type="date"
             name="from"
             defaultValue={from ?? ""}
-            className="mt-1 block rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
+            className="mt-1 block w-full sm:w-auto rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
           />
         </label>
         <label className="block">
@@ -152,7 +152,7 @@ export default async function PaymentsPage({
             type="date"
             name="to"
             defaultValue={to ?? ""}
-            className="mt-1 block rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
+            className="mt-1 block w-full sm:w-auto rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
           />
         </label>
         <button
@@ -190,7 +190,31 @@ export default async function PaymentsPage({
         {payments.length === 300 ? " (showing the most recent 300)" : ""}.
       </p>
 
-      <div className="max-h-cvh overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200 bg-white flex flex-col">
+      <ul className="space-y-2 md:hidden">
+        {payments.length === 0 && (
+          <li className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-400">
+            {filtered ? "No payments match those filters." : "No payments yet."}
+          </li>
+        )}
+        {payments.map((p) => (
+          <li key={p.id} className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="flex items-start justify-between gap-3">
+              <Link href={`/borrowers/${p.borrower_id}`} className="font-medium text-slate-900 hover:underline">
+                {nameById.get(p.borrower_id) ?? p.borrower_id.slice(0, 8)}
+              </Link>
+              <span className="shrink-0 font-semibold">{formatMinor(p.amount_minor, p.currency)}</span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              <StatusBadge status={p.status} />
+              <PaymentKindTag kind={paymentKind(p)} />
+              <span>{p.created_at.slice(0, 16).replace("T", " ")}</span>
+            </div>
+            {p.reference && <div className="mt-1 break-all text-xs text-slate-400">{p.reference}</div>}
+          </li>
+        ))}
+      </ul>
+
+      <div className="max-h-cvh hidden flex-col overflow-x-auto overflow-y-hidden rounded-lg border border-slate-200 bg-white md:flex">
         <table className="w-full table-fixed text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>

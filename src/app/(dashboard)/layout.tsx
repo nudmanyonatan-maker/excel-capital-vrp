@@ -46,20 +46,14 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen">
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-6">
-            <span className="text-sm font-bold tracking-tight text-slate-900">
-              Excel Capital
-            </span>
-            <Nav role={user.role} pendingRequests={pendingRequests} />
-          </div>
-          <div className="text-right text-xs text-slate-500">
-            <div className="font-medium text-slate-700">{user.email}</div>
-            <div>{ROLE_INFO[user.role].name}</div>
-          </div>
-        </div>
+        <Nav
+          role={user.role}
+          roleName={ROLE_INFO[user.role].name}
+          email={user.email}
+          pendingRequests={pendingRequests}
+        />
       </header>
-      <main className="mx-auto max-w-6xl px-6 py-8">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">{children}</main>
     </div>
   );
 }

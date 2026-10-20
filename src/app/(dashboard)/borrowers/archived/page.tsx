@@ -32,8 +32,8 @@ export default async function ArchivedBorrowersPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-slate-200 bg-white">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+        <table className="w-full min-w-[560px] text-sm">
           <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-5 py-3 font-medium">Business</th>

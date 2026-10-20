@@ -59,8 +59,8 @@ export default async function BorrowersPage({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">Borrowers</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <h1 className="mr-auto text-2xl font-semibold tracking-tight">Borrowers</h1>
         <Link href="/borrowers/archived" className="text-sm text-slate-500 hover:underline">
           View archived
         </Link>
@@ -77,7 +77,7 @@ export default async function BorrowersPage({
           name="q"
           defaultValue={search}
           placeholder="Search name or company number"
-          className="w-72 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm"
+          className="w-full rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm sm:w-72"
         />
         <select
           name="status"
@@ -98,7 +98,36 @@ export default async function BorrowersPage({
         </button>
       </form>
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+      {/* On a phone, one card per borrower: five columns do not fit across. */}
+      <ul className="space-y-2 md:hidden">
+        {borrowers.length === 0 && (
+          <li className="rounded-lg border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-400">
+            No borrowers found.
+          </li>
+        )}
+        {borrowers.map((b) => (
+          <li key={b.id}>
+            <Link
+              href={`/borrowers/${b.id}`}
+              className="block rounded-lg border border-slate-200 bg-white p-4 active:bg-slate-50"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <span className="font-medium text-slate-900">{b.legal_name}</span>
+                <StatusBadge status={b.status} />
+              </div>
+              <div className="mt-1 text-xs text-slate-500">
+                {b.company_number ?? "No company number"}
+                {b.contact_email ? ` · ${b.contact_email}` : ""}
+              </div>
+              <div className="mt-2">
+                <SetupCell progress={setupProgress(destinations.get(b.id) ?? [])} />
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+
+      <div className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white md:block">
         <table className="w-full text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
             <tr>

@@ -212,7 +212,7 @@ export default async function OverviewPage() {
           <Empty>Every borrower has finished setup.</Empty>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[600px] text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
                   <th className="pb-2 font-medium">Borrower</th>

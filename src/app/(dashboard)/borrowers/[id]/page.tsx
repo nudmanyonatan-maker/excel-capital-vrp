@@ -492,8 +492,8 @@ export default async function BorrowerProfile({
 
       <div className="mt-5">
         <Card title="Payment history">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="-mx-1 overflow-x-auto px-1">
+            <table className="w-full min-w-[640px] text-sm">
               <thead className="text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <th className="py-2 font-medium">Date</th>
