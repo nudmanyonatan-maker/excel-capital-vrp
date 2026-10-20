@@ -109,9 +109,9 @@ describe("reply-to", () => {
 
   it("sets reply_to so borrower replies reach a person, not a no-reply void", async () => {
     const body = captureBody();
-    const mailer = new ResendMailer("re_x", "Excel <noreply@x.test>", "accounting@xlcapital.co.uk");
+    const mailer = new ResendMailer("re_x", "Excel <noreply@x.test>", "accounting@excelcapital.co.uk");
     await mailer.send({ to: "borrower@test.invalid", subject: "s", text: "t" });
-    expect(body().reply_to).toBe("accounting@xlcapital.co.uk");
+    expect(body().reply_to).toBe("accounting@excelcapital.co.uk");
   });
 
   it("omits reply_to entirely when none is configured", async () => {
@@ -126,9 +126,9 @@ describe("reply-to", () => {
     const mailer = getMailer({
       RESEND_API_KEY: "re_x",
       EMAIL_FROM: "Excel <noreply@x.test>",
-      EMAIL_REPLY_TO: "accounting@xlcapital.co.uk",
+      EMAIL_REPLY_TO: "accounting@excelcapital.co.uk",
     });
     await mailer.send({ to: "b@test.invalid", subject: "s", text: "t" });
-    expect(body().reply_to).toBe("accounting@xlcapital.co.uk");
+    expect(body().reply_to).toBe("accounting@excelcapital.co.uk");
   });
 });
