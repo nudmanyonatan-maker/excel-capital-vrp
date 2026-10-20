@@ -132,11 +132,18 @@ export function ExecuteNowButton({
    * Stating it prevents the surprise without inviting an ad hoc change.
    */
   destinationLabel,
+  early,
 }: {
   borrowerId: string;
   nonce: string;
   amountLabel: string;
   destinationLabel?: string | null;
+  /**
+   * Set when the next repayment is not due yet, already formatted for reading.
+   * Pressing then takes that repayment early and nothing is collected on its
+   * date, which the plain "Collect £X now?" never said.
+   */
+  early?: { dueDate: string; followingDate: string | null } | null;
 }) {
   const [confirming, setConfirming] = useState(false);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
@@ -165,8 +172,19 @@ export function ExecuteNowButton({
         {confirming ? (
           <>
             <span className="text-sm font-medium text-amber-800">
-              Collect {amountLabel} now
-              {destinationLabel ? ` into ${destinationLabel}` : ""}?
+              {early ? (
+                <>
+                  The next repayment is not due until {early.dueDate}. Collect it early, now
+                  {destinationLabel ? ` into ${destinationLabel}` : ""}? It counts as the {early.dueDate}{" "}
+                  repayment, so nothing is taken that day
+                  {early.followingDate ? `, and the next one is ${early.followingDate}` : ""}.
+                </>
+              ) : (
+                <>
+                  Collect {amountLabel} now
+                  {destinationLabel ? ` into ${destinationLabel}` : ""}?
+                </>
+              )}
             </span>
             <button
               type="submit"

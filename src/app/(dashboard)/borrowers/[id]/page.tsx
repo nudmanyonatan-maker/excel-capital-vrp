@@ -4,7 +4,8 @@ import { getDb, getEnv } from "@/lib/db";
 import { unprotectString } from "@/lib/crypto";
 import { getBorrower } from "@/lib/repo/borrowers";
 import { getActiveConsent } from "@/lib/repo/consents";
-import { getActiveSchedule, isStoredDaily, parseDaysOfWeek } from "@/lib/repo/schedules";
+import { getActiveSchedule, isStoredDaily, parseDaysOfWeek, toSpec } from "@/lib/repo/schedules";
+import { earlyCollection } from "@/lib/early-collection";
 import { listPaymentsForBorrower, collectionProgress } from "@/lib/repo/payments";
 import { latestSetupLinkForBorrower } from "@/lib/repo/setup-links";
 import { getCurrentUser, hasRole } from "@/lib/auth";
@@ -140,10 +141,17 @@ export default async function BorrowerProfile({
       latestAuditEntry(db, SETUP_FAILED_ACTION, "borrower", id),
       latestAuditEntry(db, "consent.authorized", "borrower", id),
     ]);
-  const progress = loanProgress({
-    schedule,
-    ...(await collectionProgress(db, id, schedule?.id)),
-  });
+  const progressSoFar = await collectionProgress(db, id, schedule?.id);
+  const progress = loanProgress({ schedule, ...progressSoFar });
+  // Pressing "Execute payment now" before the next repayment is due takes that
+  // repayment early. Say so, with the dates, in the confirm prompt.
+  const earlyDates = schedule
+    ? earlyCollection(toSpec(schedule), schedule.next_run_date, progressSoFar, new Date().toISOString().slice(0, 10))
+    : null;
+  const longDate = (d: string) =>
+    new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }).format(
+      new Date(`${d}T00:00:00Z`),
+    );
   const canOperate = user ? hasRole(user, "operator") : false;
   // Sales reps and up: setting a borrower up, never collecting from them.
   const canOnboard = user ? hasRole(user, "sales") : false;
@@ -342,6 +350,12 @@ export default async function BorrowerProfile({
                 nonce={crypto.randomUUID()}
                 amountLabel={schedule ? formatMinor(schedule.amount_minor, schedule.currency) : "the entered amount"}
                 destinationLabel={scheduleDestination?.label ?? null}
+                early={
+                  earlyDates && {
+                    dueDate: longDate(earlyDates.dueDate),
+                    followingDate: earlyDates.followingDate ? longDate(earlyDates.followingDate) : null,
+                  }
+                }
               />
               <span className="pt-2"><InfoTip text={TIPS.executeNow} /></span>
             </span>
