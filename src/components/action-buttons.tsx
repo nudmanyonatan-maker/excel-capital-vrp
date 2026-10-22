@@ -335,7 +335,7 @@ export function RetryButton({ paymentId }: { paymentId: string }) {
  * so it asks for the figure and a short label the borrower will see on their
  * statement, and confirms the exact amount before sending.
  */
-/** Common one-off reasons, so nobody has to guess what fits on a statement. */
+/** Common one-off reasons, so the records read the same whoever takes the payment. */
 const REASON_SHORTCUTS = [
   { label: "Late fee", value: "LATEFEE" },
   { label: "Missed payment", value: "MISSEDPAY" },
@@ -348,12 +348,18 @@ export function OneOffPaymentButton({
   nonce,
   destinations = [],
   limitLabel,
+  statementReference,
 }: {
   borrowerId: string;
   nonce: string;
   destinations?: DestinationChoice[];
   /** The most one payment can be, already formatted, when there is one account. */
   limitLabel?: string | null;
+  /**
+   * What their bank actually shows: the mandate's fixed reference. Plaid puts it
+   * on every payment in place of the one typed here (see mandateReference).
+   */
+  statementReference: string;
 }) {
   const [openForm, setOpenForm] = useState(false);
   const [amount, setAmount] = useState("");
@@ -434,7 +440,7 @@ export function OneOffPaymentButton({
           <div>
             <label className="block">
               <span className="text-sm font-medium text-slate-700">
-                Reference on their statement
+                What is it for?
                 <InfoTip text={TIPS.oneOffReason} />
               </span>
               <input
@@ -471,28 +477,31 @@ export function OneOffPaymentButton({
           }`}
           aria-live="polite"
         >
+          <span className="text-slate-500">Bank statements will show </span>
+          <span className="font-mono font-semibold tracking-wide text-slate-900">{statementReference}</span>
+          <span className="mt-1 block text-xs text-slate-500">
+            Every payment from this borrower carries the reference fixed when they approved, so banks do
+            not show a different one per payment.
+          </span>
           {unusable ? (
-            <span className="text-red-800">Use letters or numbers. Banks do not accept a reference of only symbols.</span>
+            <span className="mt-2 block text-red-800">Use letters or numbers, not only symbols.</span>
           ) : preview ? (
-            <>
-              <span className="text-slate-500">Their bank statement will show </span>
+            <span className="mt-2 block">
+              <span className="text-slate-500">Saved here as </span>
               <span className="font-mono font-semibold tracking-wide text-slate-900">{preview.kept}</span>
               <span className="font-mono tracking-wide text-slate-400">{preview.code}</span>
               <span className="mt-1 block text-xs text-slate-500">
-                The last 6 characters are added automatically so every payment has its own reference.
+                Shown in their payment history, on the Payments page and in the export, so you can match it to
+                the bank line by borrower, amount and time.
                 {stripped && " Spaces and symbols are removed."}
               </span>
               {preview.cut && (
                 <span className="mt-1 block text-xs font-medium text-amber-800">
-                  Only the first 12 letters and numbers fit, so &ldquo;{preview.cut}&rdquo; is left off. Try a shorter word.
+                  Only the first 12 letters and numbers are kept, so &ldquo;{preview.cut}&rdquo; is left off.
                 </span>
               )}
-            </>
-          ) : (
-            <span className="text-slate-500">
-              Leave it blank to use the normal repayment reference, or pick one above.
             </span>
-          )}
+          ) : null}
         </div>
 
         <div className="mt-4">

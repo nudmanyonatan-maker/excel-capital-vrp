@@ -7,6 +7,7 @@ import { getActiveConsent } from "@/lib/repo/consents";
 import { getActiveSchedule, isStoredDaily, parseDaysOfWeek, toSpec } from "@/lib/repo/schedules";
 import { earlyCollection } from "@/lib/early-collection";
 import { failureStillRelevant } from "@/lib/setup-failure";
+import { statementReference } from "@/lib/reference";
 import { listPaymentsForBorrower, collectionProgress } from "@/lib/repo/payments";
 import { latestSetupLinkForBorrower } from "@/lib/repo/setup-links";
 import { getCurrentUser, hasRole } from "@/lib/auth";
@@ -385,6 +386,7 @@ export default async function BorrowerProfile({
             <span className="flex items-start gap-0.5 has-[form]:basis-full">
               <OneOffPaymentButton
                 borrowerId={borrower.id}
+                statementReference={statementReference(borrower.legal_name)}
                 nonce={crypto.randomUUID()}
                 destinations={collectableChoices}
                 // Only with one account: with several, each has its own limit.

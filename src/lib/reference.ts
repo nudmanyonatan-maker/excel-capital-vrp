@@ -27,6 +27,25 @@ export function buildUniqueReference(
   return uniqueReferenceFromBase(buildReference(template, opts), idempotencyKey);
 }
 
+/**
+ * The reference a borrower's mandate is created with: "Excel" and their name,
+ * letters and numbers only, cut to 18.
+ *
+ * This is what their bank shows on EVERY payment under the mandate. Plaid
+ * replaces each payment's own reference with it before the bank sees it: in
+ * production its PAYMENT_STATUS_UPDATE webhooks report adjusted_reference as the
+ * mandate's (e.g. "EXCELTMUKTRADINGLT" for a payment sent as "INV3436DK3WPP")
+ * on every payment where it reported one, 91 of 91 on 22 Oct 2026.
+ */
+export function mandateReference(legalName: string): string {
+  return `Excel${legalName}`.replace(/[^a-zA-Z0-9]/g, "").slice(0, 18);
+}
+
+/** The mandate reference as it appears on statements, which banks show in capitals. */
+export function statementReference(legalName: string): string {
+  return mandateReference(legalName).toUpperCase();
+}
+
 /** How much of the staff's own text survives into a unique reference. */
 const KEPT_CHARS = 12;
 
