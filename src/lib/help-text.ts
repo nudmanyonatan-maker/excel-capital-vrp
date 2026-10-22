@@ -52,7 +52,7 @@ export const TIPS = {
 
   // Buttons on a borrower
   executeNow:
-    "Takes the next scheduled repayment now. If it is not due yet it is taken early and counts as that repayment, so nothing is taken on its date. To start a schedule, just save it: it runs by itself.",
+    "Takes a scheduled repayment that is due today or overdue. It never takes one early. A saved schedule runs by itself; for money now, use Take a one-off payment.",
   setupLink:
     "Makes a secure link for the borrower to approve payments with their bank. It lasts 72 hours and is emailed to the contact email if email is set up. Otherwise copy it and send it yourself.",
   testPayment:
