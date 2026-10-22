@@ -181,8 +181,8 @@ export default async function SettingsPage() {
               name="defaultReferenceFormat"
               defaultValue={s.default_reference_format}
               wide
-              label="What the borrower sees on their bank statement"
-              help="Keep it short. Banks only show the first 18 letters, so anything longer gets cut off."
+              label="Reference saved with each scheduled payment"
+              help="For your own records. Bank statements show the reference fixed on each mandate (EXCEL and the borrower's name) instead."
             >
               <span className="mt-1 block text-xs text-slate-500">
                 Write {"{borrower}"} to fill in their name, {"{seq}"} for the

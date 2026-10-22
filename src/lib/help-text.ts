@@ -81,7 +81,7 @@ export const TIPS = {
   // One-off payment
   oneOffAmount: "In pounds. At least £1.00, and no more than the borrower's single payment limit.",
   oneOffReason:
-    "What their bank statement shows, for example LATEFEE or INV3436. Letters and numbers only, up to 12 of them; a short code is added to keep it unique.",
+    "Saved with the payment so you can match it up later, for example LATEFEE or INV3436. Bank statements show the mandate's own reference instead.",
 
   // Overview
   overviewCollected:

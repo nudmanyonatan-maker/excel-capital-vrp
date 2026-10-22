@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildReference, oneOffReferencePreview, uniqueReferenceFromBase } from "@/lib/reference";
+import { buildReference, mandateReference, oneOffReferencePreview, statementReference, uniqueReferenceFromBase } from "@/lib/reference";
 import { manualKey } from "@/lib/idempotency";
 
 describe("buildReference", () => {
@@ -52,5 +52,18 @@ describe("previewing a one-off payment's statement reference", () => {
   it("has nothing to show for blank or symbol-only text", () => {
     expect(oneOffReferencePreview("", borrowerId, nonce)).toBeNull();
     expect(oneOffReferencePreview("£ - !", borrowerId, nonce)).toBeNull();
+  });
+});
+
+describe("the reference banks actually show", () => {
+  it("is the mandate's, matching what Plaid sent for TM UK TRADING LTD in production", () => {
+    // PAYMENT_STATUS_UPDATE, 22 Oct 2026: original_reference INV3436DK3WPP,
+    // adjusted_reference EXCELTMUKTRADINGLT, as on Excel Capital's statement.
+    expect(statementReference("TM UK TRADING LTD")).toBe("EXCELTMUKTRADINGLT");
+    expect(statementReference("CODEBLITZ LIMITED")).toBe("EXCELCODEBLITZLIMI");
+  });
+
+  it("creates the mandate with the same text it always has", () => {
+    expect(mandateReference("TM UK TRADING LTD")).toBe("ExcelTMUKTRADINGLT");
   });
 });

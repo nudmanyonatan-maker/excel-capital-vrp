@@ -1,3 +1,4 @@
+import { mandateReference } from "@/lib/reference";
 import { CONSENT_PERIOD_ALIGNMENT, type PlaidClient } from "@/lib/plaid";
 import { setRecipientPlaidId } from "@/lib/repo/recipients";
 import { listDestinations } from "@/lib/repo/destinations";
@@ -147,7 +148,7 @@ export async function provisionLinkToken(
       await setConsentPlaidHash(db, consent.id, await sha256Hex(plaintextConsentId));
     }
   } else {
-    const reference = referenceFor(borrower.legal_name);
+    const reference = mandateReference(borrower.legal_name);
     // Locked to the business's own account when we have it, so the bank refuses
     // approval from any other account. Borrowers onboarded before this have none
     // and get an unlocked mandate, exactly as before.
@@ -316,10 +317,6 @@ async function repointSchedulesToReplacementConsent(
     )
     .bind(newConsentId, borrowerId, oldConsentId)
     .run();
-}
-
-function referenceFor(name: string): string {
-  return `Excel${name}`.replace(/[^a-zA-Z0-9]/g, "").slice(0, 18);
 }
 
 /**
