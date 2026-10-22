@@ -2,7 +2,8 @@
 
 import { InfoTip } from "@/components/info-tip";
 import { TIPS } from "@/lib/help-text";
-import { useActionState, useState } from "react";
+import { useActionState, useRef, useState } from "react";
+import { oneOffReferencePreview } from "@/lib/reference";
 import {
   sendSetupLinkAction,
   type SetupLinkState,
@@ -334,18 +335,30 @@ export function RetryButton({ paymentId }: { paymentId: string }) {
  * so it asks for the figure and a short label the borrower will see on their
  * statement, and confirms the exact amount before sending.
  */
+/** Common one-off reasons, so nobody has to guess what fits on a statement. */
+const REASON_SHORTCUTS = [
+  { label: "Late fee", value: "LATEFEE" },
+  { label: "Missed payment", value: "MISSEDPAY" },
+  { label: "Arrears", value: "ARREARS" },
+  { label: "Invoice", value: "INV" },
+];
+
 export function OneOffPaymentButton({
   borrowerId,
   nonce,
   destinations = [],
+  limitLabel,
 }: {
   borrowerId: string;
   nonce: string;
   destinations?: DestinationChoice[];
+  /** The most one payment can be, already formatted, when there is one account. */
+  limitLabel?: string | null;
 }) {
   const [openForm, setOpenForm] = useState(false);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  const reasonRef = useRef<HTMLInputElement>(null);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     executePaymentNowAction,
     null,
@@ -382,60 +395,127 @@ export function OneOffPaymentButton({
     );
   }
 
+  // The exact reference their bank will show, built the same way the payment is.
+  const preview = oneOffReferencePreview(reason, borrowerId, nonce);
+  const unusable = reason.trim() !== "" && preview === null;
+  const stripped = preview != null && reason.replace(/[a-zA-Z0-9]/g, "") !== "";
+
   return (
-    <div className="w-full">
-      <form action={formAction} className="flex flex-wrap items-end gap-3">
+    <div className="w-full basis-full">
+      <form action={formAction} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
         <input type="hidden" name="borrowerId" value={borrowerId} />
         <input type="hidden" name="nonce" value={nonce} />
-        <label className="block">
-          <span className="text-xs font-medium text-slate-700">
-            Amount (£)
-            <InfoTip text={TIPS.oneOffAmount} />
-          </span>
-          <input
-            name="amount"
-            type="number"
-            step="0.01"
-            min="0.01"
-            required
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="75.00"
-            className="mt-1 w-28 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-          />
-        </label>
-        <label className="block">
-          <span className="text-xs font-medium text-slate-700">
-            What is it for?
-            <InfoTip text={TIPS.oneOffReason} />
-          </span>
-          <input
-            name="reason"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            placeholder="Late fee"
-            className="mt-1 w-40 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
-          />
-          <span className="mt-1 block text-xs text-slate-500">
-            Shows on their statement. Letters and numbers only.
-          </span>
-        </label>
-        <DestinationPicker destinations={destinations} />
-        <button
-          type="submit"
-          disabled={pending || !amount}
-          className={`${btn} bg-red-700 text-white hover:bg-red-600`}
+        <h3 className="text-sm font-semibold text-slate-900">Take a one-off payment</h3>
+        <p className="mt-0.5 text-xs text-slate-500">
+          Taken straight away, on top of the normal schedule. It does not change the schedule.
+        </p>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-[10rem_1fr]">
+          <label className="block">
+            <span className="text-sm font-medium text-slate-700">
+              Amount (£)
+              <InfoTip text={TIPS.oneOffAmount} />
+            </span>
+            <input
+              name="amount"
+              type="number"
+              inputMode="decimal"
+              step="0.01"
+              min="1"
+              required
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="75.00"
+              className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+            />
+            {limitLabel && <span className="mt-1 block text-xs text-slate-500">Up to {limitLabel}</span>}
+          </label>
+
+          <div>
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">
+                Reference on their statement
+                <InfoTip text={TIPS.oneOffReason} />
+              </span>
+              <input
+                ref={reasonRef}
+                name="reason"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. LATEFEE or INV3436"
+                autoComplete="off"
+                className="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+              />
+            </label>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {REASON_SHORTCUTS.map((r) => (
+                <button
+                  key={r.value}
+                  type="button"
+                  onClick={() => {
+                    setReason(r.value);
+                    reasonRef.current?.focus();
+                  }}
+                  className="rounded-full border border-slate-300 bg-white px-2.5 py-0.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div
+          className={`mt-4 rounded-md border px-3 py-2 text-sm ${
+            unusable ? "border-red-200 bg-red-50" : "border-slate-200 bg-white"
+          }`}
+          aria-live="polite"
         >
-          {pending ? "Sending…" : `Collect £${amount || "0.00"} now`}
-        </button>
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => setOpenForm(false)}
-          className={`${btn} border border-slate-300 bg-white hover:bg-slate-50`}
-        >
-          Cancel
-        </button>
+          {unusable ? (
+            <span className="text-red-800">Use letters or numbers. Banks do not accept a reference of only symbols.</span>
+          ) : preview ? (
+            <>
+              <span className="text-slate-500">Their bank statement will show </span>
+              <span className="font-mono font-semibold tracking-wide text-slate-900">{preview.kept}</span>
+              <span className="font-mono tracking-wide text-slate-400">{preview.code}</span>
+              <span className="mt-1 block text-xs text-slate-500">
+                The last 6 characters are added automatically so every payment has its own reference.
+                {stripped && " Spaces and symbols are removed."}
+              </span>
+              {preview.cut && (
+                <span className="mt-1 block text-xs font-medium text-amber-800">
+                  Only the first 12 letters and numbers fit, so &ldquo;{preview.cut}&rdquo; is left off. Try a shorter word.
+                </span>
+              )}
+            </>
+          ) : (
+            <span className="text-slate-500">
+              Leave it blank to use the normal repayment reference, or pick one above.
+            </span>
+          )}
+        </div>
+
+        <div className="mt-4">
+          <DestinationPicker destinations={destinations} />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="submit"
+            disabled={pending || !amount || unusable}
+            className={`${btn} bg-red-700 text-white hover:bg-red-600 disabled:opacity-50`}
+          >
+            {pending ? "Sending…" : `Collect £${amount || "0.00"} now`}
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => setOpenForm(false)}
+            className={`${btn} border border-slate-300 bg-white hover:bg-slate-50`}
+          >
+            Cancel
+          </button>
+        </div>
       </form>
       {state && !dismissed && (
         <ResultBanner result={state} onDismiss={() => setDismissed(true)} />

@@ -380,11 +380,19 @@ export default async function BorrowerProfile({
             </span>
           )}
           {canOperate && (
-            <span className="flex items-start gap-0.5">
+            // Takes the whole row while the form is open, rather than squeezing
+            // in beside the other buttons.
+            <span className="flex items-start gap-0.5 has-[form]:basis-full">
               <OneOffPaymentButton
                 borrowerId={borrower.id}
                 nonce={crypto.randomUUID()}
                 destinations={collectableChoices}
+                // Only with one account: with several, each has its own limit.
+                limitLabel={
+                  collectableChoices.length <= 1 && consent?.max_payment_amount_minor
+                    ? `${formatMinor(consent.max_payment_amount_minor, consent.currency)} per payment`
+                    : null
+                }
               />
               <span className="pt-2"><InfoTip text={TIPS.oneOff} /></span>
             </span>
