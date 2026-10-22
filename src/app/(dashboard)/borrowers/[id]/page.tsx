@@ -380,7 +380,9 @@ export default async function BorrowerProfile({
             </span>
           )}
           {canOperate && (
-            <span className="flex items-start gap-0.5">
+            // Takes the whole row while the form is open, rather than squeezing
+            // in beside the other buttons.
+            <span className="flex items-start gap-0.5 has-[form]:basis-full">
               <OneOffPaymentButton
                 borrowerId={borrower.id}
                 nonce={crypto.randomUUID()}
