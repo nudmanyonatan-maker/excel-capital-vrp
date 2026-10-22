@@ -81,7 +81,7 @@ prompt_secret RESEND_API_KEY \
   Sends setup links and failure notices to borrowers."
 
 prompt_plain EMAIL_FROM \
-  "The address emails come FROM, e.g. noreply@excelcapital.co.uk
+  "The address emails come FROM, e.g. Excel Capital <noreply@notify.excelcapital.co.uk>
   Must be on a domain verified in Resend, or delivery silently fails."
 
 prompt_plain ACCESS_TEAM_DOMAIN \

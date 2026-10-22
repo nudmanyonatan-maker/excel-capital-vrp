@@ -169,6 +169,19 @@ subdomain: `excel-capital.workers.dev`.
     Replaces `onboarding@resend.dev`, which only ever delivered to the Resend
     account owner. `emailReach()` reports "live" rather than "owner-only" once
     the sending domain is not resend.dev, so the Settings page reflects this.
+  - `EMAIL_FROM=Excel Capital <noreply@notify.excelcapital.co.uk>` since
+    2026-10-22. On 2026-10-20 Ido moved excelcapital.co.uk's DNS from GoDaddy
+    to AWS Route 53 and set up the company WEBSITE's own Resend account on the
+    root domain (its own DKIM on `resend._domainkey`, bounce MX to eu-west-1).
+    A domain can carry only one `resend._domainkey`, so the platform's records
+    could not coexist there and every email 403'd ("Domain not verified") from
+    12:34 UTC on 20 Oct. The platform now sends from the subdomain, verified in
+    our Resend account (region eu-west-1), whose records never touch the
+    website's: TXT `resend._domainkey.notify`, CNAME `rsend.notify` to
+    `rsend-euw1.forge.rmta.net`, CNAME `send.notify` to `send.forge.rmta.net`.
+    The old `excelcapital.co.uk` domain in our Resend account shows Failed and
+    is unused. Replies go to `accounting@excelcapital.co.uk` (EMAIL_REPLY_TO in
+    wrangler.jsonc; it was mistyped as xlcapital.co.uk until 2026-10-20).
 
 ## GitHub Actions (CI and deploys)
 
