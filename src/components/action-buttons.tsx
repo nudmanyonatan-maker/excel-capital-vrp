@@ -141,8 +141,9 @@ export function ExecuteNowButton({
   destinationLabel?: string | null;
   /**
    * Set when the next repayment is not due yet, already formatted for reading.
-   * Pressing then takes that repayment early and nothing is collected on its
-   * date, which the plain "Collect £X now?" never said.
+   * The button is then disabled: it never collects ahead of the due date (see
+   * executePaymentNowAction), because staff pressed it expecting it to start a
+   * new schedule.
    */
   early?: { dueDate: string; followingDate: string | null } | null;
 }) {
@@ -170,22 +171,21 @@ export function ExecuteNowButton({
       <form action={formAction} className="flex flex-wrap items-center gap-2">
         <input type="hidden" name="borrowerId" value={borrowerId} />
         <input type="hidden" name="nonce" value={nonce} />
-        {confirming ? (
+        {early ? (
+          // Not due yet: nothing to press. It is collected automatically on the day.
+          <>
+            <button type="button" disabled className={`${btn} cursor-not-allowed bg-slate-200 text-slate-500`}>
+              Execute payment now
+            </button>
+            <span className="text-sm text-slate-600">
+              Next repayment is due {early.dueDate} and is taken automatically that day.
+            </span>
+          </>
+        ) : confirming ? (
           <>
             <span className="text-sm font-medium text-amber-800">
-              {early ? (
-                <>
-                  The next repayment is not due until {early.dueDate}. Collect it early, now
-                  {destinationLabel ? ` into ${destinationLabel}` : ""}? It counts as the {early.dueDate}{" "}
-                  repayment, so nothing is taken that day
-                  {early.followingDate ? `, and the next one is ${early.followingDate}` : ""}.
-                </>
-              ) : (
-                <>
-                  Collect {amountLabel} now
-                  {destinationLabel ? ` into ${destinationLabel}` : ""}?
-                </>
-              )}
+              Collect {amountLabel} now
+              {destinationLabel ? ` into ${destinationLabel}` : ""}?
             </span>
             <button
               type="submit"

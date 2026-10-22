@@ -96,6 +96,26 @@ async function executePaymentNowImpl(
   // instalment that is due and wrong for one that is not, so an early press
   // counts every attempt made today, successful or not.
   const collectingAhead = Boolean(schedule?.next_run_date && schedule.next_run_date > today);
+  // Never take a scheduled repayment before its due date.
+  //
+  // Pressing this before the due date used to collect that repayment early and
+  // move the schedule on. Staff pressed it twice in a week right after saving a
+  // new schedule, expecting it to START the schedule (ASIAN UK SPA CONFINEMENT
+  // on 20 Oct, JUST CORNISH on 22 Oct): one borrower was charged a week early
+  // and had to be refunded, and both schedules had to be put back by hand. A
+  // saved schedule runs by itself, and money needed now is a one-off payment.
+  if (isScheduledRun && collectingAhead) {
+    const due = new Intl.DateTimeFormat("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      timeZone: "UTC",
+    }).format(new Date(`${schedule!.next_run_date}T00:00:00Z`));
+    return {
+      message: `Nothing was taken. The next repayment is not due until ${due}, and it will be collected automatically that day. To take money now, use "Take a one-off payment".`,
+      tone: "info",
+    };
+  }
   if (
     schedule &&
     !(typeof overrideAmount === "string" && overrideAmount.trim()) &&
