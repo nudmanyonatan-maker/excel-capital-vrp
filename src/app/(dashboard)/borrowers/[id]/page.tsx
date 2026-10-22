@@ -385,6 +385,12 @@ export default async function BorrowerProfile({
                 borrowerId={borrower.id}
                 nonce={crypto.randomUUID()}
                 destinations={collectableChoices}
+                // Only with one account: with several, each has its own limit.
+                limitLabel={
+                  collectableChoices.length <= 1 && consent?.max_payment_amount_minor
+                    ? `${formatMinor(consent.max_payment_amount_minor, consent.currency)} per payment`
+                    : null
+                }
               />
               <span className="pt-2"><InfoTip text={TIPS.oneOff} /></span>
             </span>

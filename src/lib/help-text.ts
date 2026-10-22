@@ -80,7 +80,8 @@ export const TIPS = {
 
   // One-off payment
   oneOffAmount: "In pounds. At least £1.00, and no more than the borrower's single payment limit.",
-  oneOffReason: "Shown on the borrower's bank statement, for example \"Late fee\". Keep it short.",
+  oneOffReason:
+    "What their bank statement shows, for example LATEFEE or INV3436. Letters and numbers only, up to 12 of them; a short code is added to keep it unique.",
 
   // Overview
   overviewCollected:
