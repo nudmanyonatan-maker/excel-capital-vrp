@@ -76,3 +76,21 @@ export async function listAudit(
     .all<AuditEntry>();
   return results ?? [];
 }
+
+/**
+ * The most recent email the app tried to send, and whether the provider took it.
+ * Read straight from the audit rows every sender already writes, so the
+ * Settings page can say whether email is actually WORKING, not only configured.
+ */
+export async function latestEmailAttempt(
+  db: D1Database,
+): Promise<{ at: string; ok: boolean; action: string } | null> {
+  const row = await db
+    .prepare(
+      `SELECT created_at, action, json_extract(metadata, '$.ok') AS ok FROM audit_log
+        WHERE action LIKE 'email.%' AND json_extract(metadata, '$.mode') = 'resend'
+        ORDER BY created_at DESC LIMIT 1`,
+    )
+    .first<{ created_at: string; action: string; ok: number | null }>();
+  return row ? { at: row.created_at, ok: row.ok === 1, action: row.action } : null;
+}

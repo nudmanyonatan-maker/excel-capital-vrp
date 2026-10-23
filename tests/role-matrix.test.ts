@@ -48,6 +48,7 @@ const EXPECTED: Record<string, Role | "public"> = {
   setStaffDisabledAction: "admin",
   updateSettingsAction: "admin",
   updateSettingsFormAction: "admin",
+  sendTestEmailAction: "admin",
   addPayoutAccountAction: "admin",
   archivePayoutAccountAction: "admin",
   adoptExistingAccountAction: "admin",
