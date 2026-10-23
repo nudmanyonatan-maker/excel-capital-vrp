@@ -11,6 +11,8 @@ import { getEnv } from "@/lib/db";
 import { listAllPayoutAccounts, listUnlinkedRecipients } from "@/lib/repo/payout-accounts";
 import { describePayoutAccount, groupUnlinkedAccounts } from "@/lib/payout-accounts";
 import { PayoutAccountsPanel } from "@/components/payout-accounts-panel";
+import { TestEmailButton } from "@/components/test-email-button";
+import { latestEmailAttempt } from "@/lib/repo/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -59,6 +61,7 @@ export default async function SettingsPage() {
   const realMoney = plaidConnected && env.PLAID_ENV === "production";
   // The fallback mailer silently swallows everything, so say so plainly here
   // rather than letting staff assume borrowers are being contacted.
+  const lastEmail = await latestEmailAttempt(getDb());
   const reach = emailReach(env as MailerEnv);
 
   // Decrypted and masked here, on the server, for admins only. The panel is a
@@ -117,6 +120,25 @@ export default async function SettingsPage() {
                   : "No, not set up yet"}
             </span>
           </div>
+          {reach === "live" && (
+            <div className="space-y-2">
+              {lastEmail && (
+                <p className={`text-xs ${lastEmail.ok ? "text-slate-500" : "font-medium text-red-700"}`}>
+                  {lastEmail.ok ? "Last email went out " : "The last email FAILED to send, "}
+                  {new Intl.DateTimeFormat("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    timeZone: "Europe/London",
+                  }).format(new Date(lastEmail.at))}{" "}
+                  UK time.
+                  {!lastEmail.ok && " Send a test to check, and send setup links yourself until it works."}
+                </p>
+              )}
+              <TestEmailButton />
+            </div>
+          )}
           {reach === "off" && (
             <p className="text-xs text-amber-800">
               Setup links, receipts and failed-payment notices are NOT being sent.

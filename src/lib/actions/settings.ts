@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
+import { getEnv } from "@/lib/db";
+import { getMailer, type MailerEnv } from "@/lib/mailer";
 import { updateSettings } from "@/lib/repo/settings";
 import { writeAudit } from "@/lib/repo/audit";
 
@@ -70,4 +72,42 @@ export async function updateSettingsFormAction(
           : "Could not save these settings. Nothing was changed.",
     };
   }
+}
+
+export type TestEmailState = { ok: boolean; message: string } | null;
+
+/**
+ * Send one email to the signed-in admin through the live mail setup.
+ *
+ * "Is email set up" was only ever answered from configuration, so the Settings
+ * page said borrowers were getting emails for two days while every send was
+ * refused (the sending domain had lost its DNS records). This proves the whole
+ * path, from the app through Resend to an inbox, and goes only to the person
+ * pressing it, never to a borrower.
+ */
+export async function sendTestEmailAction(): Promise<TestEmailState> {
+  const user = await requireRole("admin");
+  const env = getEnv();
+  const mailer = getMailer(env as MailerEnv);
+  const result = await mailer.send({
+    to: user.email,
+    subject: "Test email from the Excel Capital platform",
+    text:
+      "This is a test sent from Settings to check that the platform can send email.\n\n" +
+      "If you are reading it, setup links, receipts and failed-payment notices are reaching inboxes.",
+  });
+  await writeAudit(getDb(), {
+    actorStaffId: user.id,
+    action: "email.test",
+    entityType: "settings",
+    entityId: "singleton",
+    metadata: { mode: mailer.mode, ok: result.ok, to: user.email, error: result.error ?? null },
+  });
+  revalidatePath("/settings");
+  if (mailer.mode !== "resend") {
+    return { ok: false, message: "Email is not set up in this copy, so nothing was sent." };
+  }
+  return result.ok
+    ? { ok: true, message: `Sent to ${user.email}. Check that inbox, and spam, in a minute.` }
+    : { ok: false, message: `Not sent: ${result.error ?? "the email service refused it"}.` };
 }
